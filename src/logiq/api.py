@@ -41,6 +41,12 @@ from logiq.maintenance import (
     init as init_maint, add_entry as add_maint, list_for_flight as maint_for_flight,
     list_all as maint_list, stats as maint_stats, MAINT_TYPES
 )
+from logiq.battery import per_airframe_battery_trends
+from logiq.components import per_airframe_component_status
+from logiq.autotag import suggest_tag
+from logiq.leaderboard import airframe_leaderboard
+from logiq.weather import fetch_weather, correlate_with_anomalies
+from logiq.insurance_pdf import build_insurance_pdf
 try:
     from logiq.whatsapp import router as whatsapp_router
 except Exception:
@@ -418,6 +424,97 @@ def compare_flights(a: str, b: str):
         "score_delta": B["overall_score"] - A["overall_score"],
         "category_diff": cat_diff,
     }
+
+
+@app.get("/api/battery/trends")
+def battery_trends():
+    return per_airframe_battery_trends()
+
+
+@app.get("/api/components")
+def components():
+    return per_airframe_component_status()
+
+
+@app.get("/api/autotag/{flight_id}")
+def autotag(flight_id: str):
+    con = get_conn()
+    feat = con.execute("SELECT data FROM features WHERE flight_id = ?", (flight_id,)).fetchone()
+    f = con.execute("SELECT * FROM flights WHERE id = ?", (flight_id,)).fetchone()
+    con.close()
+    if not feat or not feat["data"]:
+        raise HTTPException(404, "no features")
+    v = compute_verdict(json.loads(feat["data"]))
+    v["flight"] = {"id": flight_id, "duration_s": f["duration_s"] if f else None, "is_simulation": bool(f["is_simulation"]) if f else False}
+    return suggest_tag(v)
+
+
+@app.get("/api/leaderboard")
+def leaderboard():
+    return airframe_leaderboard()
+
+
+@app.get("/api/weather/correlation")
+def weather_correlation_endpoint(sample: int = 50):
+    """Stub: sample some flights, generate (or fetch) weather, return correlation."""
+    con = get_conn()
+    rows = con.execute("""
+        SELECT f.id, f.flown_at, a.is_anomaly, feat.data
+        FROM flights f
+        LEFT JOIN anomalies a ON a.flight_id = f.id
+        LEFT JOIN features feat ON feat.flight_id = f.id
+        WHERE f.parse_error IS NULL AND f.flown_at IS NOT NULL
+        ORDER BY f.flown_at DESC LIMIT ?
+    """, (sample,)).fetchall()
+    con.close()
+    with_weather = []
+    for r in rows:
+        d = json.loads(r["data"]) if r["data"] else {}
+        # try to pull lat from features (telemetry doesn't always store lat in features)
+        lat = 22.46  # Chittagong fallback
+        lng = 91.81
+        w = fetch_weather(lat, lng, (r["flown_at"] or "2024-01-01")[:10])
+        with_weather.append({
+            "flight_id": r["id"], "is_anomaly": bool(r["is_anomaly"]),
+            "weather": w,
+        })
+    return {
+        "summary": correlate_with_anomalies(with_weather),
+        "n_samples": len(with_weather),
+    }
+
+
+@app.get("/api/insurance/{flight_id}")
+def insurance_pdf(flight_id: str):
+    con = get_conn()
+    f = con.execute("SELECT f.*, af.bucket FROM flights f LEFT JOIN airframes af ON af.id = f.airframe_id WHERE f.id = ?", (flight_id,)).fetchone()
+    feat = con.execute("SELECT data FROM features WHERE flight_id = ?", (flight_id,)).fetchone()
+    con.close()
+    if not feat or not feat["data"]:
+        raise HTTPException(404, "no features")
+    v = compute_verdict(json.loads(feat["data"]))
+    v["flight"] = {
+        "id": f["id"], "file_name": f["file_name"], "format": f["format"],
+        "duration_s": f["duration_s"], "flown_at": f["flown_at"],
+        "firmware": f["firmware"], "bucket": f["bucket"],
+    }
+    pdf_bytes = build_insurance_pdf(v)
+    safe = (f["file_name"] or "flight").replace(" ", "_").replace(":", "-")
+    return Response(
+        content=pdf_bytes, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="logiq-insurance-{safe}.pdf"'},
+    )
+
+
+# === PWA assets ===
+@app.get("/manifest.webmanifest")
+def manifest():
+    return FileResponse(str(WEB_DIR / "manifest.webmanifest"), media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse(str(WEB_DIR / "sw.js"), media_type="application/javascript")
 
 
 @app.get("/api/airframes")

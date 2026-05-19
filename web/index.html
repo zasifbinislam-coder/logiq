@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <title>LogIQ — UAV health analytics</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0a6b3b">
+<link rel="icon" type="image/svg+xml" href="/static/icon-192.svg">
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
   :root {
@@ -221,8 +224,12 @@
     <button class="tab-btn" data-tab="photo" data-en="📷 Photo" data-bn="📷 Photo"></button>
     <button class="tab-btn" data-tab="browse" data-en="📜 Past flights" data-bn="📜 Past flights"></button>
     <button class="tab-btn" data-tab="calendar" data-en="📅 Calendar" data-bn="📅 Calendar"></button>
-    <button class="tab-btn" data-tab="achievements" data-en="🏆 Achievements" data-bn="🏆 Achievement"></button>
+    <button class="tab-btn" data-tab="achievements" data-en="🏆 Awards" data-bn="🏆 Award"></button>
     <button class="tab-btn" data-tab="maintenance" data-en="🔧 Maintenance" data-bn="🔧 Maintenance"></button>
+    <button class="tab-btn" data-tab="battery" data-en="🔋 Batteries" data-bn="🔋 Battery"></button>
+    <button class="tab-btn" data-tab="components" data-en="🧰 Components" data-bn="🧰 Component"></button>
+    <button class="tab-btn" data-tab="leaderboard" data-en="🥇 Leaderboard" data-bn="🥇 Ranking"></button>
+    <button class="tab-btn" data-tab="weather" data-en="🌤️ Weather" data-bn="🌤️ Weather"></button>
   </div>
 
   <!-- ====== ANALYZE LOG ====== -->
@@ -269,8 +276,10 @@
         <div class="verdict-meta" id="verdict-meta"></div>
         <div class="verdict-actions">
           <button class="btn primary" id="btn-pdf" data-en="⬇ PDF" data-bn="⬇ PDF"></button>
-          <button class="btn" onclick="copyShareLink()" data-en="🔗 Share link" data-bn="🔗 Share link"></button>
+          <button class="btn" id="btn-insurance" data-en="🛡️ Insurance PDF" data-bn="🛡️ Insurance PDF"></button>
+          <button class="btn" onclick="copyShareLink()" data-en="🔗 Share" data-bn="🔗 Share"></button>
           <button class="btn" onclick="window.print()" data-en="🖨️ Print" data-bn="🖨️ Print"></button>
+          <button class="btn" onclick="suggestTag()" data-en="🤖 Suggest tag" data-bn="🤖 Tag suggest"></button>
           <button class="btn" onclick="toggleAdvanced()" id="adv-btn" data-en="▼ Details" data-bn="▼ Details"></button>
           <span class="btn" style="display:inline-flex; gap:6px; align-items:center;">
             <span data-en="🏷️" data-bn="🏷️"></span>
@@ -377,6 +386,8 @@
       </div>
       <div class="filters">
         <input type="text" id="search" placeholder="Search file name…">
+        <input type="date" id="date-from" title="From date" style="font-size:12px;">
+        <input type="date" id="date-to" title="To date" style="font-size:12px;">
         <label data-en="Class:" data-bn="Class:"></label>
         <select id="filter-bucket"><option value="" data-en="All" data-bn="Sob"></option></select>
         <button onclick="loadFlights()" data-en="Refresh" data-bn="Refresh"></button>
@@ -387,11 +398,11 @@
       <table id="flights-table">
         <thead><tr>
           <th title="select for compare">⊕</th>
-          <th data-sort="flown_at" data-en="Date" data-bn="Date"></th>
-          <th data-en="File" data-bn="File"></th>
-          <th data-en="Class" data-bn="Class"></th>
-          <th data-sort="duration" data-en="Duration" data-bn="Duration"></th>
-          <th data-en="Health" data-bn="Health"></th>
+          <th data-sort="date" data-en="Date ⇅" data-bn="Date ⇅"></th>
+          <th data-sort="file" data-en="File ⇅" data-bn="File ⇅"></th>
+          <th data-sort="bucket" data-en="Class ⇅" data-bn="Class ⇅"></th>
+          <th data-sort="duration" data-en="Duration ⇅" data-bn="Duration ⇅"></th>
+          <th data-sort="health" data-en="Health ⇅" data-bn="Health ⇅"></th>
           <th data-en="Issues" data-bn="Issues"></th>
         </tr></thead>
         <tbody></tbody>
@@ -423,6 +434,47 @@
         </tr></thead>
         <tbody></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ====== BATTERY ====== -->
+  <div id="tab-battery" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="Battery health by airframe" data-bn="Airframe oboshtha battery"></h3>
+      <p class="sub" data-en="Voltage sag over time per airframe class. Growing sag = ageing battery." data-bn="Time-er sathe voltage sag. Beshi sag = battery age."></p>
+      <div id="battery-cards"></div>
+    </div>
+  </div>
+
+  <!-- ====== COMPONENTS ====== -->
+  <div id="tab-components" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="Component lifetime tracking" data-bn="Component lifetime tracking"></h3>
+      <p class="sub" data-en="Estimated hours and remaining life per component based on flight time + maintenance log." data-bn="Flight time + maintenance log theke component er ages."></p>
+      <div id="components-list"></div>
+    </div>
+  </div>
+
+  <!-- ====== LEADERBOARD ====== -->
+  <div id="tab-leaderboard" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="Airframe leaderboard" data-bn="Airframe leaderboard"></h3>
+      <p class="sub" data-en="Ranked by average health score, anomaly rate, and total hours." data-bn="Health, anomaly rate, total hours diye rank kora."></p>
+      <table id="leaderboard-table">
+        <thead><tr>
+          <th>#</th><th data-en="Airframe class" data-bn="Class"></th><th data-en="Flights" data-bn="Flight"></th><th data-en="Hours" data-bn="Hour"></th><th data-en="Anomaly %" data-bn="Anomaly %"></th><th data-en="Avg health" data-bn="Avg health"></th><th data-en="Score" data-bn="Score"></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ====== WEATHER ====== -->
+  <div id="tab-weather" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="Weather × anomaly correlation" data-bn="Weather × anomaly correlation"></h3>
+      <p class="sub" data-en="Sample of recent flights with weather conditions. Set LOGIQ_WEATHER_API env var for real data; otherwise mock values are used." data-bn="Recent flight er weather sample. LOGIQ_WEATHER_API env var set korle real data; nahole mock data."></p>
+      <div id="weather-summary"></div>
     </div>
   </div>
 
@@ -511,6 +563,10 @@ document.querySelectorAll(".tab-btn").forEach(b => {
     if (b.dataset.tab === "preflight") loadPreflight();
     if (b.dataset.tab === "achievements") loadAchievements();
     if (b.dataset.tab === "maintenance") loadMaintenanceHistory();
+    if (b.dataset.tab === "battery") loadBatteryTab();
+    if (b.dataset.tab === "components") loadComponentsTab();
+    if (b.dataset.tab === "leaderboard") loadLeaderboardTab();
+    if (b.dataset.tab === "weather") loadWeatherTab();
   });
 });
 
@@ -618,8 +674,22 @@ function renderVerdict(v) {
     if (flight.id) window.open("/api/pdf/" + flight.id, "_blank");
     else alert("PDF only after upload.");
   };
+  document.getElementById("btn-insurance").onclick = () => {
+    if (flight.id) window.open("/api/insurance/" + flight.id, "_blank");
+    else alert("Insurance PDF only after upload.");
+  };
 
   loadLabelOptions().then(() => { if (flight.id) loadCurrentLabel(flight.id); });
+}
+
+async function suggestTag() {
+  if (!currentFlightId) return;
+  const s = await fetchJson("/api/autotag/" + currentFlightId);
+  const reason = currentLang === "bn" ? s.reason_bn : s.reason_en;
+  if (confirm(`Suggested: ${s.label} (${s.confidence} confidence)\n\n${reason}\n\nApply this tag?`)) {
+    document.getElementById("label-select").value = s.label;
+    saveLabel();
+  }
 }
 
 function renderMotorDiagram(m) {
@@ -888,6 +958,7 @@ async function uploadLog(file) {
     data.verdict.flight = data.verdict.flight || {};
     data.verdict.flight.id = data.flight_id;
     renderVerdict(data.verdict);
+    notifyAnomaly(data.verdict);
     window.scrollTo({ top: 0, behavior: "smooth" });
     loadFlights();
   } catch (e) { status.className = "upload-status err"; status.innerHTML = "✗ " + e; }
@@ -1059,20 +1130,49 @@ document.querySelectorAll(".chip").forEach(c => {
 });
 document.getElementById("search").addEventListener("input", () => { clearTimeout(window._st); window._st = setTimeout(loadFlights, 250); });
 document.getElementById("filter-bucket").addEventListener("change", loadFlights);
+document.getElementById("date-from").addEventListener("change", loadFlights);
+document.getElementById("date-to").addEventListener("change", loadFlights);
+
+// Sort
+let sortBy = "score"; let sortDir = "desc";
+document.querySelectorAll("th[data-sort]").forEach(th => {
+  th.style.cursor = "pointer";
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortBy === key) sortDir = sortDir === "desc" ? "asc" : "desc";
+    else { sortBy = key; sortDir = "desc"; }
+    loadFlights();
+  });
+});
 
 async function loadFlights() {
   const bucket = document.getElementById("filter-bucket").value;
   const search = document.getElementById("search").value.toLowerCase();
+  const dateFrom = document.getElementById("date-from").value;
+  const dateTo = document.getElementById("date-to").value;
   const params = new URLSearchParams();
   if (bucket) params.set("bucket", bucket);
   if (currentFilter === "anomalies" || currentFilter === "critical") params.set("only_anomalies", "true");
-  params.set("sort", "score"); params.set("limit", "100");
+  params.set("sort", "score"); params.set("limit", "200");
   const data = await fetchJson("/api/flights?" + params.toString());
   const tbody = document.querySelector("#flights-table tbody");
   let rows = data.rows;
   if (currentFilter === "critical") rows = rows.filter(r => r.score >= 0.18);
   if (currentFilter === "good") rows = rows.filter(r => !r.is_anomaly);
   if (search) rows = rows.filter(r => r.file_name.toLowerCase().includes(search));
+  if (dateFrom) rows = rows.filter(r => (r.flown_at || "") >= dateFrom);
+  if (dateTo) rows = rows.filter(r => (r.flown_at || "").slice(0, 10) <= dateTo);
+
+  // Apply client-side sort
+  const dir = sortDir === "desc" ? -1 : 1;
+  rows.sort((a, b) => {
+    if (sortBy === "date") return ((a.flown_at || "") < (b.flown_at || "") ? -1 : 1) * dir;
+    if (sortBy === "file") return ((a.file_name || "") < (b.file_name || "") ? -1 : 1) * dir;
+    if (sortBy === "bucket") return ((a.bucket || "") < (b.bucket || "") ? -1 : 1) * dir;
+    if (sortBy === "duration") return ((a.duration_s || 0) - (b.duration_s || 0)) * dir;
+    if (sortBy === "health") return ((b.score || 0) - (a.score || 0)) * dir * -1;
+    return 0;
+  });
   document.getElementById("flightcount").textContent = `${rows.length} / ${data.total}`;
   tbody.innerHTML = rows.map(r => {
     let status = "good", label = currentLang === "bn" ? "Theek" : "Good";
@@ -1127,12 +1227,104 @@ function filterByDate(ds) {
   loadFlights();
 }
 
+// === New-tab loaders ===
+async function loadBatteryTab() {
+  const data = await fetchJson("/api/battery/trends");
+  const el = document.getElementById("battery-cards");
+  if (!data.length) { el.innerHTML = `<p style="color:var(--muted)">${currentLang === "bn" ? "Battery data nai" : "No battery data yet"}</p>`; return; }
+  el.innerHTML = data.map(b => `
+    <div style="background:var(--card); border-radius:12px; padding:16px; margin-bottom:12px; box-shadow: var(--shadow); border-left:4px solid var(--${b.status === 'good' ? 'good' : b.status === 'fair' ? 'fair' : 'poor'});">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h4 style="margin:0;">${b.bucket}</h4>
+        <span class="status-pill ${b.status}">${b.status.toUpperCase()}</span>
+      </div>
+      <div style="font-size:13px; color:var(--muted); margin-top:6px;">
+        ${b.n_flights_with_battery_data} flights · ${b.first_date} → ${b.last_date}
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:12px; font-size:13px;">
+        <div><span style="color:var(--muted)">Early avg sag:</span> <b>${b.avg_v_drop_early} V</b></div>
+        <div><span style="color:var(--muted)">Recent avg sag:</span> <b>${b.avg_v_drop_late} V</b></div>
+        <div><span style="color:var(--muted)">Drift:</span> <b style="color:${b.drift > 0.2 ? 'var(--critical)' : 'var(--good)'}">${b.drift > 0 ? "+" : ""}${b.drift} V</b></div>
+      </div>
+      <div style="margin-top:10px; font-size:13px;">${currentLang === "bn" ? b.advice_bn : b.advice_en}</div>
+    </div>`).join("");
+}
+
+async function loadComponentsTab() {
+  const data = await fetchJson("/api/components");
+  document.getElementById("components-list").innerHTML = data.filter(d => d.total_flights > 0).map(d => `
+    <div style="background:var(--card); border-radius:12px; padding:16px; margin-bottom:12px; box-shadow:var(--shadow);">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h4 style="margin:0;">${d.bucket}</h4>
+        <span style="font-size:12px; color:var(--muted);">${d.total_flights} flights · ${d.total_hours}h</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-top:12px;">
+        ${d.components.map(c => `
+          <div style="background:var(--bg); border-radius:8px; padding:10px; border:1px solid var(--border);">
+            <div style="font-size:13px; font-weight:600; text-transform:capitalize;">${c.component}</div>
+            <div style="font-size:11px; color:var(--muted); margin:4px 0;">${c.estimated_hours} / ${c.expected_lifetime_hours} hrs</div>
+            <div style="height:6px; background:var(--border); border-radius:3px; overflow:hidden;">
+              <div style="height:100%; background:${c.remaining_pct < 30 ? 'var(--critical)' : c.remaining_pct < 60 ? 'var(--fair)' : 'var(--good)'}; width:${c.remaining_pct}%;"></div>
+            </div>
+            <div style="font-size:11px; color:var(--muted); margin-top:4px;">${c.remaining_pct}% remaining · ${c.replacements} replacements</div>
+          </div>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+async function loadLeaderboardTab() {
+  const data = await fetchJson("/api/leaderboard");
+  const medals = ["🥇","🥈","🥉"];
+  document.querySelector("#leaderboard-table tbody").innerHTML = data.map((r, i) => `
+    <tr>
+      <td>${medals[i] || (i+1)}</td>
+      <td><b>${r.bucket}</b></td>
+      <td>${r.flights}</td>
+      <td>${r.hours}h</td>
+      <td>${r.anomaly_rate_pct}%</td>
+      <td>${r.avg_health}/100</td>
+      <td><b>${r.rank_score}</b></td>
+    </tr>`).join("");
+}
+
+async function loadWeatherTab() {
+  const data = await fetchJson("/api/weather/correlation");
+  const s = data.summary;
+  document.getElementById("weather-summary").innerHTML = `
+    <div style="background:var(--card); border-radius:12px; padding:18px; box-shadow:var(--shadow);">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px;">
+        <div><span style="font-size:11px; color:var(--muted); text-transform:uppercase;">${currentLang === "bn" ? "Sample" : "Samples"}</span><div style="font-size:22px; font-weight:700; color:var(--primary);">${s.n}</div></div>
+        <div><span style="font-size:11px; color:var(--muted); text-transform:uppercase;">${currentLang === "bn" ? "Anomaly rate" : "Anomaly rate"}</span><div style="font-size:22px; font-weight:700;">${s.anomaly_rate_overall}%</div></div>
+        <div><span style="font-size:11px; color:var(--muted); text-transform:uppercase;">${currentLang === "bn" ? "High-wind flight" : "High-wind flights"}</span><div style="font-size:22px; font-weight:700;">${s.high_wind_flights}</div></div>
+        <div><span style="font-size:11px; color:var(--muted); text-transform:uppercase;">${currentLang === "bn" ? "High-wind anomaly %" : "High-wind anomaly %"}</span><div style="font-size:22px; font-weight:700; color:var(--critical);">${s.anomaly_rate_high_wind}%</div></div>
+      </div>
+      <div style="margin-top:14px; padding:12px; background:var(--fair-bg); border-radius:8px; font-size:14px;">
+        ${currentLang === "bn" ? s.advice_bn : s.advice_en}
+      </div>
+    </div>`;
+}
+
+// === Notifications + PWA ===
+if ("Notification" in window && Notification.permission === "default") {
+  setTimeout(() => Notification.requestPermission(), 3000);
+}
+function notifyAnomaly(verdict) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (verdict.overall_score >= 65) return;
+  new Notification("⚠️ LogIQ — " + verdict.overall_status.toUpperCase(), {
+    body: `${verdict.overall_score}/100 — ${verdict.summary_en}`,
+    icon: "/static/icon-192.svg",
+  });
+}
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
 // === Init ===
 applyLang();
 loadStats().then(loadFlights).catch(e => console.error(e));
 loadQuickQuestions();
 
-// handle deep link #flight=xxx
 const m = location.hash.match(/flight=([^&]+)/);
 if (m) showVerdictById(m[1]);
 </script>
