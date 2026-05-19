@@ -34,12 +34,20 @@ from logiq.quickcheck import QUESTIONS as QUICK_QUESTIONS, assess as quick_asses
 from logiq.labels import LABELS as LABEL_OPTIONS, set_label as set_flight_label, get_label as get_flight_label, init as init_labels, stats as label_stats
 from logiq.photo_check import analyze_photo
 from logiq.notify import alert_if_anomaly
+from logiq.flight_path import extract_path
+from logiq.cost import estimate_cost
+from logiq.achievements import compute as compute_badges
+from logiq.maintenance import (
+    init as init_maint, add_entry as add_maint, list_for_flight as maint_for_flight,
+    list_all as maint_list, stats as maint_stats, MAINT_TYPES
+)
 try:
     from logiq.whatsapp import router as whatsapp_router
 except Exception:
     whatsapp_router = None
 
 init_labels()
+init_maint()
 
 
 BASE_DIR = Path(r"C:\Users\zasif bin islam\Desktop\LogIQ")
@@ -252,6 +260,163 @@ def motor_health(flight_id: str):
         "motors": motors,
         "imbalance_pct": range_pct,
         "data_available": (n_motors or 0) > 0,
+    }
+
+
+@app.get("/api/path/{flight_id}")
+def flight_path(flight_id: str):
+    con = get_conn()
+    f = con.execute("SELECT source_path FROM flights WHERE id = ?", (flight_id,)).fetchone()
+    con.close()
+    if not f or not f["source_path"]:
+        raise HTTPException(404, "log source path missing")
+    p = Path(f["source_path"])
+    if not p.exists():
+        # try uploads folder
+        alt = UPLOADS_DIR / f"{flight_id}{p.suffix}"
+        if alt.exists():
+            p = alt
+        else:
+            raise HTTPException(404, f"log file not found on disk: {p}")
+    return extract_path(p)
+
+
+@app.get("/api/cost/{flight_id}")
+def cost(flight_id: str):
+    con = get_conn()
+    f = con.execute("SELECT f.*, af.bucket FROM flights f LEFT JOIN airframes af ON af.id = f.airframe_id WHERE f.id = ?", (flight_id,)).fetchone()
+    feat = con.execute("SELECT data FROM features WHERE flight_id = ?", (flight_id,)).fetchone()
+    con.close()
+    if not feat or not feat["data"]:
+        raise HTTPException(404, "no features")
+    features = json.loads(feat["data"])
+    v = compute_verdict(features)
+    v["flight"] = {"id": f["id"], "file_name": f["file_name"], "bucket": f["bucket"]}
+    return estimate_cost(v)
+
+
+@app.get("/api/achievements")
+def achievements():
+    return compute_badges()
+
+
+@app.get("/api/maintenance/types")
+def maintenance_types():
+    return [{"key": k, "label": v} for k, v in MAINT_TYPES]
+
+
+@app.get("/api/maintenance/all")
+def maintenance_all(limit: int = 100):
+    return maint_list(limit=limit)
+
+
+@app.get("/api/maintenance/stats")
+def maintenance_stats_endpoint():
+    return maint_stats()
+
+
+@app.get("/api/flight/{flight_id}/maintenance")
+def get_flight_maintenance(flight_id: str):
+    return maint_for_flight(flight_id)
+
+
+class MaintEntry(BaseModel):
+    type: str
+    description: str = ""
+    cost_bdt: float | None = None
+
+
+@app.post("/api/flight/{flight_id}/maintenance")
+def add_flight_maintenance(flight_id: str, payload: MaintEntry):
+    mid = add_maint(flight_id, payload.type, payload.description, payload.cost_bdt)
+    return {"id": mid, "ok": True}
+
+
+@app.get("/api/export.csv")
+def export_csv(only_anomalies: bool = False):
+    """Bulk CSV export of all flights with their features for analysis."""
+    import csv, io
+    con = get_conn()
+    where = "f.parse_error IS NULL"
+    if only_anomalies:
+        where += " AND a.is_anomaly = 1"
+    rows = con.execute(f"""
+        SELECT f.id, f.file_name, f.format, f.flown_at, f.duration_s, f.firmware,
+               f.is_simulation, af.bucket, a.score, a.is_anomaly,
+               l.label, feat.data
+        FROM flights f
+        LEFT JOIN airframes af ON af.id = f.airframe_id
+        LEFT JOIN anomalies a ON a.flight_id = f.id
+        LEFT JOIN labels l ON l.flight_id = f.id
+        LEFT JOIN features feat ON feat.flight_id = f.id
+        WHERE {where}
+        ORDER BY f.flown_at DESC
+    """).fetchall()
+    con.close()
+
+    # Collect feature keys
+    parsed = []
+    keys: set[str] = set()
+    for r in rows:
+        d = json.loads(r["data"]) if r["data"] else {}
+        keys.update(d.keys())
+        parsed.append((dict(r), d))
+    feat_keys = sorted(keys - {"path", "errors", "unique_modes"})
+
+    base_cols = ["id", "file_name", "format", "flown_at", "duration_s", "firmware",
+                 "is_simulation", "bucket", "anomaly_score", "is_anomaly", "label"]
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(base_cols + feat_keys)
+    for meta, feats in parsed:
+        row = [
+            meta["id"], meta["file_name"], meta["format"], meta["flown_at"],
+            meta["duration_s"], meta["firmware"], meta["is_simulation"],
+            meta["bucket"], meta["score"], meta["is_anomaly"], meta["label"] or "",
+        ]
+        row += [feats.get(k, "") for k in feat_keys]
+        w.writerow(row)
+
+    return Response(content=buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="logiq-fleet.csv"'})
+
+
+@app.get("/api/compare")
+def compare_flights(a: str, b: str):
+    """Return side-by-side verdicts + diff."""
+    def _get(fid):
+        con = get_conn()
+        f = con.execute("SELECT f.*, af.bucket FROM flights f LEFT JOIN airframes af ON af.id = f.airframe_id WHERE f.id = ?", (fid,)).fetchone()
+        feat = con.execute("SELECT data FROM features WHERE flight_id = ?", (fid,)).fetchone()
+        con.close()
+        if not f or not feat:
+            return None
+        feats = json.loads(feat["data"])
+        v = compute_verdict(feats)
+        v["flight"] = {
+            "id": f["id"], "file_name": f["file_name"], "format": f["format"],
+            "duration_s": f["duration_s"], "flown_at": f["flown_at"],
+            "firmware": f["firmware"], "bucket": f["bucket"],
+        }
+        v["features"] = feats
+        return v
+
+    A, B = _get(a), _get(b)
+    if not A or not B:
+        raise HTTPException(404, "one of the flights not found")
+    # category-by-category diff
+    cat_diff = []
+    for ca, cb in zip(A["categories"], B["categories"]):
+        cat_diff.append({
+            "key": ca["key"], "name": ca["name_en"], "icon": ca["icon"],
+            "a_score": ca["score"], "b_score": cb["score"],
+            "delta": cb["score"] - ca["score"],
+        })
+    return {
+        "a": A, "b": B,
+        "score_delta": B["overall_score"] - A["overall_score"],
+        "category_diff": cat_diff,
     }
 
 

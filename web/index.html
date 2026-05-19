@@ -221,6 +221,8 @@
     <button class="tab-btn" data-tab="photo" data-en="📷 Photo" data-bn="📷 Photo"></button>
     <button class="tab-btn" data-tab="browse" data-en="📜 Past flights" data-bn="📜 Past flights"></button>
     <button class="tab-btn" data-tab="calendar" data-en="📅 Calendar" data-bn="📅 Calendar"></button>
+    <button class="tab-btn" data-tab="achievements" data-en="🏆 Achievements" data-bn="🏆 Achievement"></button>
+    <button class="tab-btn" data-tab="maintenance" data-en="🔧 Maintenance" data-bn="🔧 Maintenance"></button>
   </div>
 
   <!-- ====== ANALYZE LOG ====== -->
@@ -283,6 +285,28 @@
       <div class="motor-diagram" id="motor-diagram" style="display:none;">
         <h3 data-en="🔧 Motor health" data-bn="🔧 Motor health"></h3>
         <div class="motor-svg-wrap"><svg class="motor-svg" id="motor-svg" viewBox="0 0 320 320"></svg></div>
+      </div>
+
+      <div class="card-section" id="cost-card" style="display:none; margin-bottom: 18px;">
+        <h3 data-en="💰 Estimated repair cost" data-bn="💰 Repair khoroch er estimate"></h3>
+        <div id="cost-body"></div>
+      </div>
+
+      <div class="card-section" id="path-card" style="display:none; margin-bottom: 18px;">
+        <h3 data-en="🗺️ 3D flight path" data-bn="🗺️ 3D flight path"></h3>
+        <div id="path-plot" style="height:380px;"></div>
+      </div>
+
+      <div class="card-section" id="maint-card" style="display:none; margin-bottom: 18px;">
+        <h3 data-en="🔧 Maintenance log" data-bn="🔧 Maintenance log"></h3>
+        <p class="sub" data-en="Record what you fixed after this flight." data-bn="Ei flight er por ki fix korechho lekho."></p>
+        <div id="maint-existing"></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+          <select id="maint-type" style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text);"></select>
+          <input id="maint-desc" type="text" placeholder="Description (optional)" style="flex:1; min-width:180px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text);">
+          <input id="maint-cost" type="number" placeholder="Cost BDT" style="width:110px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text);">
+          <button class="btn primary" onclick="addMaintenance()" data-en="Add" data-bn="Add"></button>
+        </div>
       </div>
 
       <div class="actions-block">
@@ -356,16 +380,46 @@
         <label data-en="Class:" data-bn="Class:"></label>
         <select id="filter-bucket"><option value="" data-en="All" data-bn="Sob"></option></select>
         <button onclick="loadFlights()" data-en="Refresh" data-bn="Refresh"></button>
+        <button onclick="window.open('/api/export.csv', '_blank')" data-en="⬇ CSV" data-bn="⬇ CSV"></button>
+        <button class="btn" id="compare-btn" onclick="runCompare()" style="display:none;" data-en="🔍 Compare" data-bn="🔍 Compare"></button>
         <span style="margin-left:auto; font-size:11px; color:var(--muted);" id="flightcount"></span>
       </div>
       <table id="flights-table">
         <thead><tr>
+          <th title="select for compare">⊕</th>
           <th data-sort="flown_at" data-en="Date" data-bn="Date"></th>
           <th data-en="File" data-bn="File"></th>
           <th data-en="Class" data-bn="Class"></th>
           <th data-sort="duration" data-en="Duration" data-bn="Duration"></th>
           <th data-en="Health" data-bn="Health"></th>
           <th data-en="Issues" data-bn="Issues"></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ====== ACHIEVEMENTS ====== -->
+  <div id="tab-achievements" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="Your flying achievements" data-bn="Tomar flying achievement"></h3>
+      <div id="ach-stats" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin: 14px 0;"></div>
+      <div id="ach-badges" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px;"></div>
+    </div>
+  </div>
+
+  <!-- ====== MAINTENANCE ====== -->
+  <div id="tab-maintenance" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="Maintenance history" data-bn="Maintenance history"></h3>
+      <p class="sub" id="maint-summary"></p>
+      <table id="maint-table">
+        <thead><tr>
+          <th data-en="Date" data-bn="Date"></th>
+          <th data-en="Type" data-bn="Type"></th>
+          <th data-en="Description" data-bn="Description"></th>
+          <th data-en="Cost (Tk)" data-bn="Cost (Tk)"></th>
+          <th data-en="Flight" data-bn="Flight"></th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -455,6 +509,8 @@ document.querySelectorAll(".tab-btn").forEach(b => {
     document.getElementById("tab-" + b.dataset.tab).classList.add("active");
     if (b.dataset.tab === "calendar") renderCalendar();
     if (b.dataset.tab === "preflight") loadPreflight();
+    if (b.dataset.tab === "achievements") loadAchievements();
+    if (b.dataset.tab === "maintenance") loadMaintenanceHistory();
   });
 });
 
@@ -544,6 +600,18 @@ function renderVerdict(v) {
       if (m.data_available) renderMotorDiagram(m);
       else document.getElementById("motor-diagram").style.display = "none";
     }).catch(() => document.getElementById("motor-diagram").style.display = "none");
+
+    // 3D flight path
+    fetchJson("/api/path/" + flight.id).then(p => {
+      if (p.ok) renderFlightPath(p);
+      else document.getElementById("path-card").style.display = "none";
+    }).catch(() => document.getElementById("path-card").style.display = "none");
+
+    // Cost estimate
+    fetchJson("/api/cost/" + flight.id).then(c => renderCost(c)).catch(() => document.getElementById("cost-card").style.display = "none");
+
+    // Maintenance entries
+    loadFlightMaintenance(flight.id);
   }
 
   document.getElementById("btn-pdf").onclick = () => {
@@ -582,6 +650,179 @@ function renderMotorDiagram(m) {
     svgContent += `<text class="motor-label" x="${p.x}" y="${p.y + 14}" style="font-size:10px;">${mt.score}</text>`;
   });
   svg.innerHTML = svgContent;
+}
+
+function renderFlightPath(p) {
+  document.getElementById("path-card").style.display = "block";
+  const trace = {
+    type: "scatter3d", mode: "lines+markers",
+    x: p.lng, y: p.lat, z: p.alt,
+    marker: { size: 2, color: p.alt, colorscale: "Viridis", showscale: false },
+    line: { color: "#0a6", width: 3 },
+    name: "Path",
+  };
+  const layout = {
+    margin: { l: 0, r: 0, b: 0, t: 20 },
+    scene: {
+      xaxis: { title: "Lng" }, yaxis: { title: "Lat" }, zaxis: { title: "Alt (m)" },
+      aspectmode: "auto",
+    },
+    height: 380,
+    paper_bgcolor: getComputedStyle(document.body).backgroundColor,
+    font: { color: getComputedStyle(document.body).color },
+  };
+  Plotly.newPlot("path-plot", [trace], layout, { displayModeBar: false });
+}
+
+function renderCost(c) {
+  document.getElementById("cost-card").style.display = "block";
+  const body = document.getElementById("cost-body");
+  if (!c.items.length) {
+    body.innerHTML = `<div style="color:var(--good); padding: 10px; font-size: 14px;">${currentLang === "bn" ? c.summary_bn : c.summary_en}</div>`;
+    return;
+  }
+  const itemsHtml = c.items.map(i =>
+    `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border);">
+      <span style="font-size:13px;">${i.desc}</span>
+      <span style="font-size:13px; font-family:monospace;">Tk ${i.lo.toLocaleString()} – ${i.hi.toLocaleString()}</span>
+    </div>`).join("");
+  body.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:2px solid var(--primary); font-weight:600;">
+      <span>${currentLang === "bn" ? "Total estimate" : "Total estimate"}</span>
+      <span style="font-size:18px; color:var(--primary);">Tk ${c.total_min_bdt.toLocaleString()} – ${c.total_max_bdt.toLocaleString()}</span>
+    </div>
+    ${itemsHtml}
+    ${c.downtime_days ? `<div style="margin-top:10px; font-size:12px; color:var(--muted);">${currentLang === "bn" ? "Downtime" : "Downtime"}: ~${c.downtime_days} ${currentLang === "bn" ? "din" : "days"}</div>` : ""}`;
+}
+
+let MAINT_TYPES = [];
+async function ensureMaintTypes() {
+  if (MAINT_TYPES.length) return;
+  MAINT_TYPES = await fetchJson("/api/maintenance/types");
+  document.getElementById("maint-type").innerHTML = MAINT_TYPES.map(t => `<option value="${t.key}">${t.label}</option>`).join("");
+}
+
+async function loadFlightMaintenance(flightId) {
+  document.getElementById("maint-card").style.display = "block";
+  await ensureMaintTypes();
+  const entries = await fetchJson("/api/flight/" + flightId + "/maintenance");
+  document.getElementById("maint-existing").innerHTML = entries.length === 0 ?
+    `<div style="color:var(--muted); font-size:12px; padding:8px 0;">${currentLang === "bn" ? "Ekhono kichu fix lekha nai" : "No maintenance recorded yet"}</div>` :
+    entries.map(e => `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
+      <span><b>${e.type}</b> · ${e.description || ""}</span>
+      <span style="color:var(--muted)">${e.cost_bdt ? "Tk " + e.cost_bdt.toLocaleString() : ""} · ${(e.performed_at || "").slice(0, 10)}</span>
+    </div>`).join("");
+}
+
+async function addMaintenance() {
+  if (!currentFlightId) return;
+  const type = document.getElementById("maint-type").value;
+  const desc = document.getElementById("maint-desc").value;
+  const cost = parseFloat(document.getElementById("maint-cost").value) || null;
+  await fetchJson("/api/flight/" + currentFlightId + "/maintenance", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, description: desc, cost_bdt: cost }),
+  });
+  document.getElementById("maint-desc").value = "";
+  document.getElementById("maint-cost").value = "";
+  loadFlightMaintenance(currentFlightId);
+}
+
+async function loadAchievements() {
+  const a = await fetchJson("/api/achievements");
+  document.getElementById("ach-stats").innerHTML = [
+    { l: "Flights", v: a.total_flights, i: "🚁" },
+    { l: "Hours", v: a.total_hours, i: "⏱️" },
+    { l: "Healthy", v: a.healthy_flights, i: "🟢" },
+    { l: "Current streak", v: a.current_streak, i: "🔥" },
+    { l: "Best streak", v: a.longest_streak, i: "🏅" },
+    { l: "Labeled", v: a.label_count, i: "🏷️" },
+  ].map(s => `<div class="kpi" style="background:var(--card); border-radius:10px; padding:14px;">
+    <div style="font-size:22px;">${s.i}</div>
+    <div style="font-size:11px; color:var(--muted); text-transform:uppercase;">${s.l}</div>
+    <div style="font-size:22px; font-weight:700; color:var(--primary);">${s.v}</div>
+  </div>`).join("");
+
+  document.getElementById("ach-badges").innerHTML = a.badges.map(b => {
+    const opacity = b.earned ? "1" : "0.35";
+    const checkmark = b.earned ? "✓" : "";
+    const progress = b.progress.target ?
+      `<div style="height:4px; background:var(--border); border-radius:2px; margin-top:6px;"><div style="height:100%; background:var(--primary); width:${Math.min(100, (b.progress.current / b.progress.target) * 100)}%; border-radius:2px;"></div></div>
+       <div style="font-size:10px; color:var(--muted); margin-top:3px;">${b.progress.current} / ${b.progress.target}</div>` : "";
+    return `<div style="background:var(--card); border-radius:10px; padding:12px; opacity:${opacity}; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+      <div style="font-size:22px;">${b.icon} ${checkmark}</div>
+      <div style="font-weight:600; font-size:13px; margin:4px 0;">${currentLang === "bn" ? b.bn : b.en}</div>
+      ${progress}
+    </div>`;
+  }).join("");
+}
+
+async function loadMaintenanceHistory() {
+  const stats = await fetchJson("/api/maintenance/stats");
+  const items = await fetchJson("/api/maintenance/all");
+  document.getElementById("maint-summary").textContent =
+    `${stats.total_entries} entries · Total spent: Tk ${(stats.total_cost_bdt || 0).toLocaleString()}`;
+  const tbody = document.querySelector("#maint-table tbody");
+  tbody.innerHTML = items.length === 0 ?
+    `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:20px;">${currentLang === "bn" ? "Ekhono kichu lekha nai. Verdict view e fixed kichur entry add koro." : "No maintenance recorded yet. Add entries on the verdict view."}</td></tr>` :
+    items.map(m => `<tr ${m.flight_id ? `onclick="showVerdictById('${m.flight_id}')"` : ""}>
+      <td>${(m.performed_at || "").slice(0, 10)}</td>
+      <td><b>${m.type}</b></td>
+      <td>${m.description || ""}</td>
+      <td>${m.cost_bdt ? "Tk " + m.cost_bdt.toLocaleString() : "—"}</td>
+      <td>${m.file_name ? `<span style="color:var(--primary); font-family:monospace; font-size:11px;">${m.file_name}</span>` : "—"}</td>
+    </tr>`).join("");
+}
+
+// === COMPARE ===
+let compareSet = new Set();
+function toggleCompareSelection(id, evt) {
+  evt.stopPropagation();
+  if (compareSet.has(id)) compareSet.delete(id);
+  else if (compareSet.size < 2) compareSet.add(id);
+  else { alert("Only 2 flights at a time"); return; }
+  document.getElementById("compare-btn").style.display = compareSet.size === 2 ? "inline-block" : "none";
+  document.getElementById("compare-btn").textContent =
+    currentLang === "bn" ? `🔍 Compare (${compareSet.size}/2)` : `🔍 Compare (${compareSet.size}/2)`;
+  loadFlights(); // refresh row highlighting
+}
+async function runCompare() {
+  const ids = Array.from(compareSet);
+  if (ids.length !== 2) return;
+  try {
+    const r = await fetchJson(`/api/compare?a=${ids[0]}&b=${ids[1]}`);
+    renderCompareModal(r);
+  } catch (e) { alert("Compare failed: " + e); }
+}
+function renderCompareModal(r) {
+  const A = r.a, B = r.b;
+  const html = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      ${[A, B].map(v => `
+        <div class="verdict-hero ${v.overall_status}" style="padding:14px;">
+          <div style="font-size:11px; color:var(--muted); font-family:monospace;">${v.flight.file_name}</div>
+          <div class="score-circle ${v.overall_status}" style="width:80px; height:80px; font-size:30px;">${v.overall_score}</div>
+          <div style="font-size:13px;">${currentLang === "bn" ? v.summary_bn : v.summary_en}</div>
+        </div>`).join("")}
+    </div>
+    <h4 style="margin: 14px 0 10px;">${currentLang === "bn" ? "Category diff" : "Category diff"}</h4>
+    <table>
+      <thead><tr><th></th><th>A</th><th>B</th><th>Δ</th></tr></thead>
+      <tbody>${r.category_diff.map(c => {
+        const d = c.delta;
+        const color = d > 5 ? "var(--good)" : (d < -5 ? "var(--critical)" : "var(--muted)");
+        const arrow = d > 0 ? "▲" : (d < 0 ? "▼" : "→");
+        return `<tr><td>${c.icon} ${c.name}</td><td>${c.a_score}</td><td>${c.b_score}</td><td style="color:${color}; font-weight:600;">${arrow} ${Math.abs(d)}</td></tr>`;
+      }).join("")}</tbody>
+    </table>
+    <div style="text-align:center; margin-top:14px; font-size:13px;">
+      ${currentLang === "bn" ? "Overall delta" : "Overall delta"}: <b style="color:${r.score_delta > 0 ? 'var(--good)' : 'var(--critical)'};">${r.score_delta > 0 ? "+" : ""}${r.score_delta}</b>
+    </div>
+  `;
+  // Use the onboarding modal slot for reuse
+  document.querySelector("#onboard .modal-content").innerHTML = html +
+    `<button class="btn primary close-modal" onclick="closeOnboarding()" style="margin-top:12px;">Close</button>`;
+  document.getElementById("onboard").classList.add("open");
 }
 
 function toggleAdvanced() {
@@ -841,7 +1082,9 @@ async function loadFlights() {
       else { status = "fair"; label = "Fair"; }
     }
     const reasons = (r.reasons || []).slice(0, 2).join("; ") || "—";
-    return `<tr onclick="showVerdictById('${r.id}')">
+    const selected = compareSet.has(r.id);
+    return `<tr onclick="showVerdictById('${r.id}')" style="${selected ? 'background: var(--good-bg);' : ''}">
+      <td><input type="checkbox" ${selected ? "checked" : ""} onclick="toggleCompareSelection('${r.id}', event)" title="compare"></td>
       <td>${(r.flown_at || "").slice(0,10)}</td>
       <td>${r.file_name}</td>
       <td>${r.bucket || ""}</td>
