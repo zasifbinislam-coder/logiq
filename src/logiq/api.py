@@ -90,6 +90,171 @@ def stats():
     }
 
 
+@app.get("/api/demo")
+def demo_flight():
+    """Return one critical demo flight id so beginners can try without uploading."""
+    con = get_conn()
+    # prefer the catastrophic 2023-02-02 if present, else worst anomaly we have
+    row = con.execute("""
+        SELECT f.id FROM flights f WHERE f.file_name LIKE '%2023-02-02 23-16-05%' LIMIT 1
+    """).fetchone()
+    if not row:
+        row = con.execute("""
+            SELECT f.id FROM flights f JOIN anomalies a ON a.flight_id = f.id
+            WHERE a.is_anomaly = 1 AND f.parse_error IS NULL
+            ORDER BY a.score DESC LIMIT 1
+        """).fetchone()
+    con.close()
+    if not row:
+        raise HTTPException(404, "no demo flight available")
+    return {"flight_id": row["id"]}
+
+
+@app.get("/api/glossary")
+def glossary():
+    from logiq.verdict import GLOSSARY
+    return GLOSSARY
+
+
+@app.get("/api/calendar")
+def calendar(months: int = 6):
+    """Return per-day flight summaries for a heatmap visualization."""
+    con = get_conn()
+    rows = con.execute("""
+        SELECT f.id, substr(f.flown_at, 1, 10) AS day,
+               f.duration_s, feat.data
+        FROM flights f
+        LEFT JOIN features feat ON feat.flight_id = f.id
+        WHERE f.parse_error IS NULL AND f.flown_at IS NOT NULL
+    """).fetchall()
+    con.close()
+
+    from collections import defaultdict
+    by_day: dict[str, dict] = defaultdict(lambda: {"flights": 0, "worst_score": 100, "total_hours": 0.0})
+    for r in rows:
+        d = r["day"]
+        if not d: continue
+        feat = json.loads(r["data"]) if r["data"] else {}
+        # rough health proxy: combine vibration, clip, control error
+        v = feat.get("vibe_z_p95") or 0
+        c = feat.get("clip_events_total") or 0
+        re = feat.get("roll_err_deg_p95") or 0
+        # crude health 0-100
+        score = 100
+        if v > 30: score = min(score, 10)
+        elif v > 15: score = min(score, 50)
+        elif v > 5: score = min(score, 75)
+        if c > 10000: score = min(score, 10)
+        elif c > 1000: score = min(score, 35)
+        if re > 20: score = min(score, 10)
+        elif re > 10: score = min(score, 40)
+        elif re > 5: score = min(score, 70)
+        by_day[d]["flights"] += 1
+        by_day[d]["worst_score"] = min(by_day[d]["worst_score"], score)
+        by_day[d]["total_hours"] += (r["duration_s"] or 0) / 3600.0
+
+    out = []
+    for day in sorted(by_day.keys()):
+        b = by_day[day]
+        out.append({"day": day, "flights": b["flights"],
+                    "worst_score": b["worst_score"],
+                    "total_hours": round(b["total_hours"], 2)})
+    return out
+
+
+@app.get("/api/preflight")
+def preflight_checklist():
+    """Personalized pre-flight checklist built from recent issues."""
+    con = get_conn()
+    # recent 30 flights
+    rows = con.execute("""
+        SELECT f.id, f.flown_at, feat.data, af.bucket
+        FROM flights f
+        LEFT JOIN features feat ON feat.flight_id = f.id
+        LEFT JOIN airframes af ON af.id = f.airframe_id
+        WHERE f.parse_error IS NULL
+        ORDER BY f.flown_at DESC LIMIT 30
+    """).fetchall()
+    con.close()
+
+    from collections import Counter
+    issues = Counter()
+    last_features = {}
+    if rows:
+        last_features = json.loads(rows[0]["data"]) if rows[0]["data"] else {}
+
+    for r in rows:
+        d = json.loads(r["data"]) if r["data"] else {}
+        if (d.get("vibe_z_p95") or 0) > 15:    issues["vibration"] += 1
+        if (d.get("clip_events_total") or 0) > 1000: issues["clipping"] += 1
+        if (d.get("roll_err_deg_p95") or 0) > 5: issues["tuning"] += 1
+        if (d.get("gps_hdop_max") or 0) > 2.5 and (d.get("gps_hdop_max") or 0) < 50: issues["gps"] += 1
+        if (d.get("ekf_mag_var_p95") or 0) > 0.3: issues["compass"] += 1
+        if (d.get("esc_rpm_range_pct") or 0) > 10: issues["motor"] += 1
+
+    items: list[dict] = []
+    # Universal pre-flight
+    items.append({"key": "battery", "en": "Battery fully charged and balanced", "bn": "Battery fully charge ar balanced", "priority": "always"})
+    items.append({"key": "props", "en": "Propellers undamaged and tightly mounted", "bn": "Propeller damage nai ar tight mount kora", "priority": "always"})
+    items.append({"key": "gps_wait", "en": "Wait for 8+ GPS satellites locked", "bn": "8+ GPS satellite lock holo na porjonto wait koro", "priority": "always"})
+
+    # Personalized
+    if issues.get("vibration", 0) >= 3:
+        items.append({"key": "vib", "en": f"Re-balance propellers — vibration noted in {issues['vibration']} recent flights", "bn": f"Propeller re-balance koro — last {issues['vibration']} flight e vibration paya gechhe", "priority": "high"})
+    if issues.get("clipping", 0) >= 2:
+        items.append({"key": "clip", "en": "Inspect frame and motor mounts for looseness — IMU has been clipping", "bn": "Frame ar motor mount check koro — IMU clip korchhilo", "priority": "high"})
+    if issues.get("tuning", 0) >= 3:
+        items.append({"key": "tune", "en": "Re-tune PID gains — drone has been sluggish recently", "bn": "PID re-tune koro — drone slow chhilo recent flight e", "priority": "medium"})
+    if issues.get("gps", 0) >= 3:
+        items.append({"key": "gps_env", "en": "Check takeoff area — recent GPS issues suggest interference", "bn": "Takeoff area dekho — recent flight e GPS issue paya gechhe", "priority": "medium"})
+    if issues.get("compass", 0) >= 2:
+        items.append({"key": "compass_cal", "en": "Re-calibrate compass — recent EKF compass variance high", "bn": "Compass re-calibrate koro — compass variance high chhilo", "priority": "medium"})
+    if issues.get("motor", 0) >= 2:
+        items.append({"key": "motor_inspect", "en": "Inspect motors — RPM imbalance pattern detected", "bn": "Motor inspect koro — RPM imbalance detect hoyechhe", "priority": "high"})
+
+    return {
+        "recent_flights_analyzed": len(rows),
+        "items": items,
+        "summary_en": f"Generated from your last {len(rows)} flights. {sum(issues.values())} issue patterns found.",
+        "summary_bn": f"Tomar last {len(rows)} flight theke generate. {sum(issues.values())} issue pattern paya gechhe.",
+        "issue_counts": dict(issues),
+    }
+
+
+@app.get("/api/motor_health/{flight_id}")
+def motor_health(flight_id: str):
+    """Per-motor health breakdown for the quad/hex diagram."""
+    con = get_conn()
+    feat = con.execute("SELECT data FROM features WHERE flight_id = ?", (flight_id,)).fetchone()
+    f = con.execute("SELECT format FROM flights WHERE id = ?", (flight_id,)).fetchone()
+    con.close()
+    if not feat or not feat["data"]:
+        raise HTTPException(404, "no features")
+    d = json.loads(feat["data"])
+
+    n_motors = d.get("rcout_motor_count") or d.get("esc_count") or 0
+    worst = d.get("esc_worst_motor")
+    range_pct = d.get("esc_rpm_range_pct") or 0
+    motors: list[dict] = []
+    # 4 motors default for quad — emit health per motor inferred from imbalance
+    for i in range(max(int(n_motors or 0), 4)):
+        score = 100
+        notes = []
+        if worst is not None and int(worst) == i:
+            score -= min(int(range_pct * 3), 60)
+            notes.append(f"highest RPM deviation (~{range_pct:.1f}%)")
+        if score < 0: score = 0
+        motors.append({"motor": i + 1, "score": score, "notes": notes})
+
+    return {
+        "n_motors": int(n_motors or 4),
+        "format": f["format"] if f else None,
+        "motors": motors,
+        "imbalance_pct": range_pct,
+        "data_available": (n_motors or 0) > 0,
+    }
+
+
 @app.get("/api/airframes")
 def airframes():
     con = get_conn()
