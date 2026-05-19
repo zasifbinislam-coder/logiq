@@ -552,6 +552,28 @@ def update_drone(drone_id: str, p: AirframePayload, user=Depends(current_user)):
     return hw_mod.update_airframe(drone_id, **p.model_dump())
 
 
+@app.get("/api/drones/templates")
+def list_drone_templates():
+    return [{"key": k, **{kk: vv for kk, vv in v.items() if kk != "components"},
+             "component_count": len(v["components"])}
+            for k, v in hw_mod.TEMPLATES.items()]
+
+
+class TemplateInstall(BaseModel):
+    template_key: str
+    custom_name: str = ""
+
+
+@app.post("/api/drones/from-template")
+def create_drone_from_template(p: TemplateInstall, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    try:
+        return hw_mod.create_from_template(user["id"], p.template_key, p.custom_name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.delete("/api/drones/{drone_id}")
 def delete_drone(drone_id: str, user=Depends(current_user)):
     if not user:

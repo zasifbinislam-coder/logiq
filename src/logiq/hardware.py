@@ -222,3 +222,85 @@ def delete_component(component_id: str):
     con.execute("DELETE FROM user_components WHERE id = ?", (component_id,))
     con.commit()
     con.close()
+
+
+# Pre-built drone templates (component bundle for one-click setup)
+TEMPLATES = {
+    "freestyle_5":  {
+        "name": "Standard 5\" Freestyle",
+        "description": "Typical 5-inch acro/freestyle quad with 4S/6S power",
+        "frame_class": "quad", "motor_count": 4, "auw_g": 580, "frame_size_mm": 220,
+        "components": [
+            {"type": "motor",   "catalog_id": "iflight_xing_2207_1855", "quantity": 4},
+            {"type": "esc",     "catalog_id": "holybro_tekko32_65a",    "quantity": 1},
+            {"type": "prop",    "catalog_id": "hqprop_5x4_3x3",          "quantity": 4},
+            {"type": "battery", "catalog_id": "cnhl_black_1500_4s_100c", "quantity": 1},
+            {"type": "fc",      "catalog_id": "speedybee_f7v3",          "quantity": 1},
+        ],
+    },
+    "cinematic_7": {
+        "name": "Cinematic 7\" long-range",
+        "description": "Long-range cinematic platform; 6S, big prop",
+        "frame_class": "quad", "motor_count": 4, "auw_g": 850, "frame_size_mm": 295,
+        "components": [
+            {"type": "motor",   "catalog_id": "tmotor_f60_pro_v_1750",  "quantity": 4},
+            {"type": "esc",     "catalog_id": "tmotor_f45a_v2",         "quantity": 1},
+            {"type": "prop",    "catalog_id": "gemfan_5152s",            "quantity": 4},
+            {"type": "battery", "catalog_id": "tattu_5200_4s_15c",       "quantity": 1},
+            {"type": "fc",      "catalog_id": "matek_h743_wing",         "quantity": 1},
+        ],
+    },
+    "tinywhoop": {
+        "name": "Tinywhoop 65mm",
+        "description": "Indoor / micro brushless whoop",
+        "frame_class": "quad", "motor_count": 4, "auw_g": 30, "frame_size_mm": 65,
+        "components": [
+            {"type": "motor", "catalog_id": "happymodel_se1404_2900", "quantity": 4},
+            {"type": "esc",   "catalog_id": "blheli_s_20a",            "quantity": 1},
+            {"type": "prop",  "catalog_id": "hq_t3x3x3",               "quantity": 4},
+            {"type": "fc",    "catalog_id": "speedybee_f7v3",          "quantity": 1},
+        ],
+    },
+    "agri_hex_15kg": {
+        "name": "Agricultural hex (15kg)",
+        "description": "Heavy-lift agri-spray hex with 6S2P battery",
+        "frame_class": "hex", "motor_count": 6, "auw_g": 15000, "frame_size_mm": 1200,
+        "components": [
+            {"type": "motor",   "catalog_id": "tmotor_u8ii_100",         "quantity": 6},
+            {"type": "esc",     "catalog_id": "tmotor_alpha_60a_hv",     "quantity": 6},
+            {"type": "prop",    "catalog_id": "tmotor_carbon_22x66",     "quantity": 6},
+            {"type": "battery", "catalog_id": "tattu_plus_62000_6s2p_15c", "quantity": 1},
+            {"type": "fc",      "catalog_id": "pixhawk_cube_orange",     "quantity": 1},
+        ],
+    },
+    "photo_quad": {
+        "name": "Photography quad (10\")",
+        "description": "Aerial photo platform with 4S 5200mAh and 1045 props",
+        "frame_class": "quad", "motor_count": 4, "auw_g": 1400, "frame_size_mm": 450,
+        "components": [
+            {"type": "motor",   "catalog_id": "dji_2212_920",        "quantity": 4},
+            {"type": "esc",     "catalog_id": "hobbywing_skywalker_40a", "quantity": 4},
+            {"type": "prop",    "catalog_id": "dji_1045",             "quantity": 4},
+            {"type": "battery", "catalog_id": "tattu_5200_4s_15c",    "quantity": 1},
+            {"type": "fc",      "catalog_id": "pixhawk_6c",           "quantity": 1},
+        ],
+    },
+}
+
+
+def create_from_template(user_id: str, template_key: str, custom_name: str = "") -> dict:
+    tmpl = TEMPLATES.get(template_key)
+    if not tmpl:
+        raise ValueError(f"unknown template: {template_key}")
+    af = create_airframe(
+        user_id,
+        name=custom_name or tmpl["name"],
+        description=tmpl["description"],
+        frame_class=tmpl["frame_class"],
+        frame_size_mm=tmpl["frame_size_mm"],
+        motor_count=tmpl["motor_count"],
+        auw_g=tmpl["auw_g"],
+    )
+    for c in tmpl["components"]:
+        add_component(af["id"], type=c["type"], catalog_id=c["catalog_id"], quantity=c["quantity"])
+    return get_airframe(af["id"])

@@ -208,6 +208,62 @@
   .modal-content h3 { margin: 0 0 12px; color: var(--primary); font-size: 22px; }
   .modal-content ul { text-align: left; padding-left: 20px; line-height: 1.7; }
   .modal-content .close-modal { margin-top: 16px; }
+
+  /* === MY DRONES === */
+  .drone-card { background: var(--card); border-radius: 14px; padding: 18px; margin-top: 14px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .drone-card-head { display: flex; justify-content: space-between; align-items: start; gap: 10px; flex-wrap: wrap; }
+  .drone-title { display: flex; align-items: center; gap: 8px; }
+  .drone-title .frame-badge { font-size: 11px; padding: 3px 8px; background: var(--bg); border-radius: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .drone-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 12px 0; padding: 10px; background: var(--bg); border-radius: 8px; }
+  .drone-stat { text-align: center; }
+  .drone-stat .l { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .drone-stat .v { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; }
+  .completeness { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 10px; }
+  .completeness .bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .completeness .fill { height: 100%; background: var(--good); transition: width 0.3s; }
+  .comp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .comp-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; position: relative; }
+  .comp-card .ctype { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+  .comp-card .ctype .typ { display: flex; align-items: center; gap: 4px; }
+  .comp-card .cname { font-weight: 600; font-size: 13px; margin-bottom: 2px; color: var(--text); }
+  .comp-card .cspecs { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+  .comp-card .spec-chip { background: var(--card); padding: 2px 7px; border-radius: 8px; font-size: 11px; color: var(--text); border: 1px solid var(--border); }
+  .comp-card .cfooter { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 11px; }
+  .comp-card .cprice { color: var(--good); font-weight: 600; }
+  .comp-card .cdel { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 4px; }
+  .comp-card .cdel:hover { color: var(--critical); }
+  .comp-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px; background: var(--bg); border-radius: 10px; border: 1px dashed var(--border); }
+
+  /* Component picker modal */
+  .picker-tabs { display: flex; gap: 4px; padding: 4px; background: var(--bg); border-radius: 10px; margin-bottom: 12px; }
+  .picker-tab { flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer; border-radius: 7px; font-size: 12px; color: var(--muted); }
+  .picker-tab.active { background: var(--primary); color: white; }
+  .picker-tab:hover:not(.active) { background: var(--card); }
+  .picker-list { max-height: 360px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; }
+  .picker-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.1s; background: var(--card); }
+  .picker-item:hover { background: var(--good-bg); border-color: var(--primary); transform: translateX(2px); }
+  .picker-item.selected { background: var(--good-bg); border-color: var(--primary); }
+  .picker-item .head { display: flex; justify-content: space-between; align-items: baseline; }
+  .picker-item .brand { font-weight: 600; }
+  .picker-item .model { color: var(--muted); font-size: 13px; }
+  .picker-item .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .picker-item .spec-chip { background: var(--bg); padding: 2px 7px; border-radius: 8px; font-size: 11px; color: var(--text); border: 1px solid var(--border); }
+  .qty-stepper { display: inline-flex; align-items: center; }
+  .qty-stepper button { width: 32px; height: 32px; border: 1px solid var(--border); background: var(--card); cursor: pointer; font-size: 16px; color: var(--text); }
+  .qty-stepper button:first-child { border-radius: 7px 0 0 7px; }
+  .qty-stepper button:last-child { border-radius: 0 7px 7px 0; }
+  .qty-stepper input { width: 60px; text-align: center; border: 1px solid var(--border); border-left: none; border-right: none; padding: 6px; background: var(--card); color: var(--text); font-size: 14px; height: 32px; box-sizing: border-box; }
+  .field { display: block; margin: 10px 0; }
+  .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+  .field input, .field textarea, .field select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); color: var(--text); font-size: 14px; font-family: inherit; box-sizing: border-box; }
+
+  /* Templates */
+  .templates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 6px 0; }
+  .template-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.1s; }
+  .template-card:hover { border-color: var(--primary); background: var(--good-bg); transform: translateY(-1px); }
+  .template-card .tname { font-weight: 600; font-size: 13px; margin-bottom: 4px; color: var(--text); }
+  .template-card .tdesc { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .template-card .tmeta { font-size: 11px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -600,24 +656,108 @@
 
 <!-- New drone modal -->
 <div class="modal-backdrop" id="newdrone-modal">
-  <div class="modal-content" style="text-align:left; min-width:420px;">
+  <div class="modal-content" style="text-align:left; min-width:480px; max-width:600px;">
     <h3 data-en="New drone build" data-bn="Notun drone build"></h3>
-    <input type="text" id="nd-name" placeholder="Build name (e.g. FireGuard Mk1)" style="width:100%; padding:9px 12px; margin:8px 0; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
-    <select id="nd-class" style="width:100%; padding:9px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
-      <option value="quad">Quadcopter (4 motors)</option>
-      <option value="hex">Hexacopter (6)</option>
-      <option value="octo">Octocopter (8)</option>
-      <option value="12">Y12 / X12 (12)</option>
-      <option value="plane">Plane</option>
-      <option value="vtol">VTOL</option>
-    </select>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <input type="number" id="nd-size" placeholder="Frame size (mm)" style="padding:9px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
-      <input type="number" id="nd-auw" placeholder="AUW (grams)" style="padding:9px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+
+    <div style="background:var(--good-bg); border-radius:8px; padding:10px; margin:10px 0;">
+      <div style="font-size:12px; font-weight:600; color:var(--primary); margin-bottom:6px;" data-en="✨ Quick start with a template" data-bn="✨ Template e quick start"></div>
+      <div class="templates-grid" id="templates-grid"></div>
     </div>
-    <textarea id="nd-desc" rows="2" placeholder="Description (optional)" style="width:100%; padding:9px 12px; margin-top:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);"></textarea>
-    <button class="btn primary" onclick="submitNewDrone()" style="width:100%; margin-top:10px;" data-en="Create build" data-bn="Build create koro"></button>
-    <button class="btn" onclick="closeNewDrone()" style="width:100%; margin-top:6px;" data-en="Cancel" data-bn="Cancel"></button>
+
+    <div style="text-align:center; color:var(--muted); margin:14px 0; font-size:12px;" data-en="— or build from scratch —" data-bn="— or scratch theke banaw —"></div>
+
+    <div class="field">
+      <label data-en="Build name" data-bn="Build name"></label>
+      <input type="text" id="nd-name" placeholder="e.g. FireGuard Mk1, My freestyle quad">
+    </div>
+    <div class="field">
+      <label data-en="Airframe class" data-bn="Airframe class"></label>
+      <select id="nd-class">
+        <option value="quad">Quadcopter (4 motors)</option>
+        <option value="hex">Hexacopter (6)</option>
+        <option value="octo">Octocopter (8)</option>
+        <option value="12">Y12 / X12 (12)</option>
+        <option value="plane">Plane</option>
+        <option value="vtol">VTOL</option>
+      </select>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="field">
+        <label data-en="Frame size (mm)" data-bn="Frame size (mm)"></label>
+        <input type="number" id="nd-size" placeholder="e.g. 220, 450">
+      </div>
+      <div class="field">
+        <label data-en="AUW — all-up weight (g)" data-bn="AUW — total weight (g)"></label>
+        <input type="number" id="nd-auw" placeholder="e.g. 580, 12000">
+      </div>
+    </div>
+    <div class="field">
+      <label data-en="Description (optional)" data-bn="Description (optional)"></label>
+      <textarea id="nd-desc" rows="2" placeholder="What's this drone for?"></textarea>
+    </div>
+
+    <div style="display:flex; gap:6px; margin-top:14px;">
+      <button class="btn" onclick="closeNewDrone()" style="flex:1;" data-en="Cancel" data-bn="Cancel"></button>
+      <button class="btn primary" onclick="submitNewDrone()" style="flex:2;" data-en="Create build" data-bn="Build create koro"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Component picker modal -->
+<div class="modal-backdrop" id="picker-modal">
+  <div class="modal-content" style="text-align:left; min-width:520px; max-width:680px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 id="picker-title" style="margin:0;" data-en="Add component" data-bn="Component add"></h3>
+      <button class="cdel" onclick="closePicker()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted);">×</button>
+    </div>
+
+    <!-- STEP 1: pick type + item -->
+    <div id="picker-step1">
+      <div class="picker-tabs">
+        <button class="picker-tab active" data-type="motor"   onclick="setPickerType('motor')">⚡ Motor</button>
+        <button class="picker-tab" data-type="esc"     onclick="setPickerType('esc')">🔌 ESC</button>
+        <button class="picker-tab" data-type="prop"    onclick="setPickerType('prop')">🌀 Prop</button>
+        <button class="picker-tab" data-type="battery" onclick="setPickerType('battery')">🔋 Battery</button>
+        <button class="picker-tab" data-type="fc"      onclick="setPickerType('fc')">🎛️ FC</button>
+      </div>
+      <input type="search" id="picker-search" placeholder="Search by brand or model…" style="width:100%; padding:9px 12px; margin-bottom:10px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);" oninput="renderPickerList()">
+      <div class="picker-list" id="picker-list"></div>
+    </div>
+
+    <!-- STEP 2: configure -->
+    <div id="picker-step2" style="display:none;">
+      <div id="picker-selected" style="background:var(--good-bg); border:1px solid var(--primary); border-radius:8px; padding:12px; margin-bottom:14px;"></div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field">
+          <label data-en="Quantity" data-bn="Quantity"></label>
+          <div class="qty-stepper">
+            <button type="button" onclick="cpQty(-1)">−</button>
+            <input type="number" id="cp-qty" value="1" min="1" max="20">
+            <button type="button" onclick="cpQty(+1)">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label data-en="Unit price (BDT)" data-bn="Unit price (BDT)"></label>
+          <input type="number" id="cp-price" placeholder="e.g. 2500" min="0">
+        </div>
+      </div>
+
+      <div class="field">
+        <label data-en="Vendor / shop (optional)" data-bn="Vendor (optional)"></label>
+        <input type="text" id="cp-vendor" placeholder="e.g. RoboticsBD, AliExpress">
+      </div>
+
+      <div class="field">
+        <label data-en="Notes (optional)" data-bn="Notes (optional)"></label>
+        <textarea id="cp-notes" rows="2" placeholder="Anything to remember about this part?"></textarea>
+      </div>
+
+      <div style="display:flex; gap:6px; margin-top:14px;">
+        <button class="btn" onclick="pickerBack()" style="flex:1;" data-en="← Back" data-bn="← Back"></button>
+        <button class="btn primary" onclick="pickerSubmit()" style="flex:2;" data-en="Add to build" data-bn="Build e add koro"></button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1431,53 +1571,66 @@ async function loadMyDrones() {
     wrap.innerHTML = `<div style="text-align:center; color:var(--muted); padding:30px;">${currentLang === "bn" ? "Ekhono kono drone add nai. Notun drone build click koro." : "No drones yet. Click New drone build above."}</div>`;
     return;
   }
+  const COMP_ICON = { motor: "⚡", esc: "🔌", prop: "🌀", battery: "🔋", fc: "🎛️" };
+  const COMP_LABEL = { motor: "Motor", esc: "ESC", prop: "Propeller", battery: "Battery", fc: "Flight controller" };
+
   wrap.innerHTML = await Promise.all(drones.map(async d => {
     const [comp, cost] = await Promise.all([
       fetchJson("/api/drones/" + d.id + "/compatibility").catch(() => null),
       fetchJson("/api/drones/" + d.id + "/cost").catch(() => null),
     ]);
     const compHtml = comp && comp.ok ? renderCompatibility(comp) : "";
-    const costHtml = cost && cost.total_bdt ? `
-      <div style="margin-top:10px; padding:10px 12px; background:var(--good-bg); border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:13px; color:var(--good);">💰 ${currentLang === "bn" ? "Total build cost" : "Total build cost"}</span>
-        <span style="font-weight:700; color:var(--good); font-size:15px;">Tk ${cost.total_bdt.toLocaleString()}</span>
-      </div>` : "";
+
+    // build completeness: count of distinct component types present (max 5)
+    const typesPresent = new Set((d.components || []).map(c => c.type));
+    const pct = Math.round(100 * typesPresent.size / 5);
+
+    const compsHtml = (d.components || []).length === 0 ?
+      `<div class="comp-empty">${currentLang === "bn" ? "Kono component nai. Niche '+ Component' click koro." : "No components yet. Click '+ Component' below to add."}</div>` :
+      `<div class="comp-grid">${(d.components || []).map(c => {
+        const ds = c.specs && c.specs.datasheet_url ? `<a href="${c.specs.datasheet_url}" target="_blank" style="color:var(--primary); text-decoration:none;">📄</a>` : "";
+        const price = c.unit_price_bdt ? `Tk ${(c.unit_price_bdt * (c.quantity || 1)).toLocaleString()}` : "";
+        const chips = c.specs ? specChips(c.type, c.specs).filter(Boolean).slice(0, 3).map(s => `<span class="spec-chip">${s}</span>`).join("") : "";
+        return `<div class="comp-card">
+          <div class="ctype">
+            <span class="typ">${COMP_ICON[c.type] || "🔧"} ${COMP_LABEL[c.type] || c.type}${c.quantity > 1 ? ` × ${c.quantity}` : ""}</span>
+            <button class="cdel" onclick="deleteComponent('${c.id}','${d.id}')" title="remove">×</button>
+          </div>
+          <div class="cname">${c.specs ? c.specs.brand + " " + c.specs.model : (c.custom_name || c.catalog_id || "?")}</div>
+          <div class="cspecs">${chips}</div>
+          <div class="cfooter"><span>${ds}</span><span class="cprice">${price}</span></div>
+        </div>`;
+      }).join("")}</div>`;
+
     return `
-      <div style="background:var(--card); border-radius:12px; padding:18px; margin-top:14px; box-shadow:var(--shadow);">
-        <div style="display:flex; justify-content:space-between; align-items:start; gap:10px; flex-wrap:wrap;">
-          <div>
+      <div class="drone-card">
+        <div class="drone-card-head">
+          <div class="drone-title">
             <h4 style="margin:0;">${d.name}</h4>
-            <div style="font-size:12px; color:var(--muted); margin-top:3px;">
-              ${d.frame_class} · ${d.motor_count} motors · ${d.auw_g || "?"}g AUW · ${d.frame_size_mm || "?"}mm
-            </div>
-            ${d.description ? `<div style="font-size:13px; margin-top:6px;">${d.description}</div>` : ""}
+            <span class="frame-badge">${d.frame_class}</span>
           </div>
           <div style="display:flex; gap:6px;">
-            <button class="btn" onclick="addComponentDialog('${d.id}')" data-en="+ Component" data-bn="+ Component">+ Component</button>
-            <button class="btn" onclick="deleteDrone('${d.id}')" style="color:var(--critical);">🗑️</button>
+            <button class="btn primary" onclick="openComponentPicker('${d.id}')">${currentLang === "bn" ? "+ Component" : "+ Component"}</button>
+            <button class="btn" onclick="deleteDrone('${d.id}')" title="delete" style="color:var(--critical);">🗑️</button>
           </div>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:8px; margin-top:12px;">
-          ${(d.components || []).map(c => {
-            const ds = c.specs && c.specs.datasheet_url ? `<a href="${c.specs.datasheet_url}" target="_blank" style="font-size:11px; color:var(--primary); text-decoration:none;">📄 datasheet</a>` : "";
-            const price = c.unit_price_bdt ? `Tk ${(c.unit_price_bdt * (c.quantity || 1)).toLocaleString()}` : "";
-            return `<div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px;">
-              <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted); text-transform:uppercase;">
-                <span>${c.type}${c.quantity > 1 ? ` ×${c.quantity}` : ""}</span>
-                <button onclick="deleteComponent('${c.id}','${d.id}')" style="background:none; border:none; color:var(--critical); cursor:pointer; font-size:12px;">×</button>
-              </div>
-              <div style="font-weight:600; font-size:13px; margin:4px 0;">
-                ${c.specs ? c.specs.brand + " " + c.specs.model : (c.custom_name || c.catalog_id || "?")}
-              </div>
-              ${c.specs ? `<div style="font-size:11px; color:var(--muted);">${formatSpec(c.type, c.specs)}</div>` : ""}
-              <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:11px;">
-                <span>${ds}</span>
-                <span style="color:var(--good); font-weight:600;">${price}</span>
-              </div>
-            </div>`;
-          }).join("")}
+        ${d.description ? `<div style="font-size:13px; color:var(--muted); margin-top:6px;">${d.description}</div>` : ""}
+
+        <div class="drone-stats">
+          <div class="drone-stat"><div class="l">Motors</div><div class="v">${d.motor_count}</div></div>
+          <div class="drone-stat"><div class="l">AUW</div><div class="v">${d.auw_g ? d.auw_g + "g" : "—"}</div></div>
+          <div class="drone-stat"><div class="l">Frame</div><div class="v">${d.frame_size_mm ? d.frame_size_mm + "mm" : "—"}</div></div>
+          <div class="drone-stat"><div class="l">Cost</div><div class="v" style="color:var(--good);">${cost && cost.total_bdt ? "Tk " + cost.total_bdt.toLocaleString() : "—"}</div></div>
+          <div class="drone-stat"><div class="l">Parts</div><div class="v">${(d.components || []).length}</div></div>
         </div>
-        ${costHtml}
+
+        <div class="completeness">
+          <span style="color:var(--muted);">${currentLang === "bn" ? "Build" : "Build"}</span>
+          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+          <span><b>${typesPresent.size}/5</b></span>
+        </div>
+
+        ${compsHtml}
         ${compHtml}
       </div>`;
   })).then(html => html.join(""));
@@ -1526,7 +1679,7 @@ function renderCompatibility(c) {
     </div>`;
 }
 
-function openNewDroneModal() { document.getElementById("newdrone-modal").classList.add("open"); }
+function openNewDroneModal() { document.getElementById("newdrone-modal").classList.add("open"); loadDroneTemplates(); }
 function closeNewDrone() { document.getElementById("newdrone-modal").classList.remove("open"); }
 async function submitNewDrone() {
   const name = document.getElementById("nd-name").value.trim();
@@ -1559,24 +1712,114 @@ async function deleteComponent(cid, did) {
   loadMyDrones();
 }
 
-async function addComponentDialog(droneId) {
-  const type = prompt("Component type? (motor / esc / prop / battery / fc)");
-  if (!type) return;
-  const items = await fetchJson("/api/catalog/" + type);
-  if (!items.length) { alert("No items in catalog"); return; }
-  const list = items.map((i, idx) => `${idx + 1}. ${i.brand} ${i.model}`).join("\n");
-  const pick = prompt(`Pick by number:\n\n${list}`);
-  const idx = parseInt(pick) - 1;
-  if (isNaN(idx) || idx < 0 || idx >= items.length) return;
-  const qty = parseInt(prompt("Quantity?", "1") || "1") || 1;
-  const price = parseFloat(prompt("Unit price (BDT, optional)?", "") || "");
-  await fetchJson("/api/drones/" + droneId + "/components", {
+// === Component picker (proper modal) ===
+let pickerState = { droneId: null, type: "motor", items: [], selected: null };
+
+function openComponentPicker(droneId) {
+  pickerState = { droneId, type: "motor", items: [], selected: null };
+  document.getElementById("picker-step1").style.display = "block";
+  document.getElementById("picker-step2").style.display = "none";
+  document.getElementById("picker-search").value = "";
+  document.getElementById("cp-qty").value = "1";
+  document.getElementById("cp-price").value = "";
+  document.getElementById("cp-vendor").value = "";
+  document.getElementById("cp-notes").value = "";
+  setPickerType("motor");
+  document.getElementById("picker-modal").classList.add("open");
+}
+function closePicker() { document.getElementById("picker-modal").classList.remove("open"); }
+
+async function setPickerType(type) {
+  pickerState.type = type;
+  document.querySelectorAll(".picker-tab").forEach(t => t.classList.toggle("active", t.dataset.type === type));
+  await renderPickerList();
+}
+
+function specChips(type, s) {
+  if (type === "motor")  return [`${s.kv} KV`, `${s.max_current_a} A`, `${s.battery_cells_min}-${s.battery_cells_max}S`, `${s.prop_recommended_min_in}-${s.prop_recommended_max_in}" prop`, `${s.weight_g} g`];
+  if (type === "esc")    return [`${s.max_current_a} A cont`, `${s.burst_a || s.max_current_a} A burst`, `${s.voltage_cells_min}-${s.voltage_cells_max}S`, s.fw, `${s.weight_g} g`];
+  if (type === "prop")   return [`${s.diameter_in}" Ø`, `${s.pitch_in}" pitch`, `${s.blades} blade`, s.material, `${s.weight_g} g`];
+  if (type === "battery") return [`${s.cells}S`, `${s.capacity_mah} mAh`, `${s.c_rating}C`, `${s.weight_g} g`, s.connector];
+  if (type === "fc")     return [s.mcu, `IMU×${s.imu_count}`, s.compass ? "compass" : "", s.barometer ? "baro" : "", `${s.weight_g} g`];
+  return [];
+}
+
+async function renderPickerList() {
+  const q = document.getElementById("picker-search").value;
+  const items = await fetchJson(`/api/catalog/${pickerState.type}?q=${encodeURIComponent(q)}`);
+  pickerState.items = items;
+  const wrap = document.getElementById("picker-list");
+  if (!items.length) { wrap.innerHTML = `<div style="color:var(--muted); text-align:center; padding:20px;">No items</div>`; return; }
+  wrap.innerHTML = items.map((it, idx) => {
+    const chips = specChips(pickerState.type, it).filter(Boolean).map(c => `<span class="spec-chip">${c}</span>`).join("");
+    const ds = it.datasheet_url ? `<a href="${it.datasheet_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:11px; color:var(--primary); text-decoration:none;">📄 datasheet</a>` : "";
+    return `<div class="picker-item" onclick="pickerSelect(${idx})">
+      <div class="head"><span class="brand">${it.brand}</span><span class="model">${it.model}</span></div>
+      <div class="row">${chips}</div>
+      <div style="margin-top:4px;">${ds}</div>
+    </div>`;
+  }).join("");
+}
+
+function pickerSelect(idx) {
+  pickerState.selected = pickerState.items[idx];
+  const it = pickerState.selected;
+  const chips = specChips(pickerState.type, it).filter(Boolean).map(c => `<span class="spec-chip" style="background:var(--card);">${c}</span>`).join("");
+  document.getElementById("picker-selected").innerHTML = `
+    <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.4px;">Selected</div>
+    <div style="font-weight:700; font-size:15px; margin:4px 0;">${it.brand} ${it.model}</div>
+    <div class="row" style="display:flex; flex-wrap:wrap; gap:4px;">${chips}</div>`;
+  document.getElementById("picker-step1").style.display = "none";
+  document.getElementById("picker-step2").style.display = "block";
+}
+
+function pickerBack() {
+  document.getElementById("picker-step1").style.display = "block";
+  document.getElementById("picker-step2").style.display = "none";
+}
+
+function cpQty(delta) {
+  const inp = document.getElementById("cp-qty");
+  const v = Math.max(1, Math.min(20, (parseInt(inp.value) || 1) + delta));
+  inp.value = v;
+}
+
+async function pickerSubmit() {
+  if (!pickerState.selected) return;
+  const qty = Math.max(1, parseInt(document.getElementById("cp-qty").value) || 1);
+  const priceRaw = document.getElementById("cp-price").value;
+  const price = priceRaw ? parseFloat(priceRaw) : null;
+  const vendor = document.getElementById("cp-vendor").value;
+  const notes = document.getElementById("cp-notes").value;
+  await fetchJson("/api/drones/" + pickerState.droneId + "/components", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      type, catalog_id: items[idx].id, quantity: qty,
-      unit_price_bdt: isNaN(price) ? null : price,
+      type: pickerState.type, catalog_id: pickerState.selected.id,
+      quantity: qty, unit_price_bdt: isNaN(price) ? null : price,
+      vendor, notes,
     }),
   });
+  closePicker();
+  loadMyDrones();
+}
+
+async function loadDroneTemplates() {
+  const tmpls = await fetchJson("/api/drones/templates");
+  document.getElementById("templates-grid").innerHTML = tmpls.map(t => `
+    <div class="template-card" onclick="installTemplate('${t.key}')">
+      <div class="tname">${t.name}</div>
+      <div class="tdesc">${t.description}</div>
+      <div class="tmeta">${t.motor_count} motors · ${t.auw_g}g · ${t.component_count} parts</div>
+    </div>`).join("");
+}
+
+async function installTemplate(key) {
+  if (!confirm("Install this template? It will create a new drone build with all components pre-loaded.")) return;
+  await fetchJson("/api/drones/from-template", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ template_key: key }),
+  });
+  closeNewDrone();
   loadMyDrones();
 }
 
