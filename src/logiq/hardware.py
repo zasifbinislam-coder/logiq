@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS user_components (
   custom_name TEXT,           -- user can free-form
   quantity INTEGER DEFAULT 1,
   specs_json TEXT,            -- frozen snapshot of catalog spec at add time
+  unit_price_bdt REAL,
+  vendor TEXT,
+  purchased_at TEXT,
   notes TEXT,
   added_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -48,11 +51,23 @@ CREATE INDEX IF NOT EXISTS idx_user_components_airframe ON user_components(airfr
 """
 
 
+def _migrate():
+    """Add new price columns if they don't exist (idempotent)."""
+    con = get_conn()
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(user_components)").fetchall()}
+    for col, sqltype in [("unit_price_bdt", "REAL"), ("vendor", "TEXT"), ("purchased_at", "TEXT")]:
+        if col not in cols:
+            con.execute(f"ALTER TABLE user_components ADD COLUMN {col} {sqltype}")
+    con.commit()
+    con.close()
+
+
 def init():
     con = get_conn()
     con.executescript(SCHEMA_EXTRA)
     con.commit()
     con.close()
+    _migrate()
 
 
 def create_airframe(user_id: str, *, name: str, description: str = "",
@@ -124,7 +139,9 @@ def delete_airframe(airframe_id: str):
 
 
 def add_component(airframe_id: str, *, type: str, catalog_id: str | None = None,
-                  custom_name: str = "", quantity: int = 1, notes: str = "") -> dict:
+                  custom_name: str = "", quantity: int = 1, notes: str = "",
+                  unit_price_bdt: float | None = None, vendor: str = "",
+                  purchased_at: str = "") -> dict:
     init()
     cid = str(uuid.uuid4())
     specs = None
@@ -134,13 +151,39 @@ def add_component(airframe_id: str, *, type: str, catalog_id: str | None = None,
             specs = json.dumps(c)
     con = get_conn()
     con.execute(
-        """INSERT INTO user_components (id, airframe_id, type, catalog_id, custom_name, quantity, specs_json, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (cid, airframe_id, type, catalog_id, custom_name or None, quantity, specs, notes or None),
+        """INSERT INTO user_components (id, airframe_id, type, catalog_id, custom_name, quantity, specs_json, notes, unit_price_bdt, vendor, purchased_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (cid, airframe_id, type, catalog_id, custom_name or None, quantity, specs, notes or None,
+         unit_price_bdt, vendor or None, purchased_at or None),
     )
     con.commit()
     con.close()
     return get_component(cid)
+
+
+def total_build_cost(airframe_id: str) -> dict:
+    """Sum component prices for one drone build."""
+    comps = list_components(airframe_id)
+    total = 0.0
+    by_type: dict[str, float] = {}
+    have_prices = 0
+    missing_prices = 0
+    for c in comps:
+        unit = c.get("unit_price_bdt")
+        qty = c.get("quantity") or 1
+        if unit is not None:
+            line = unit * qty
+            total += line
+            by_type[c["type"]] = by_type.get(c["type"], 0) + line
+            have_prices += 1
+        else:
+            missing_prices += 1
+    return {
+        "total_bdt": round(total, 2),
+        "by_type": {k: round(v, 2) for k, v in by_type.items()},
+        "components_with_price": have_prices,
+        "components_missing_price": missing_prices,
+    }
 
 
 def list_components(airframe_id: str) -> list[dict]:

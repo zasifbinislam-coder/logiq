@@ -51,6 +51,10 @@ from logiq import users as users_mod
 from logiq import hardware as hw_mod
 from logiq import compatibility as compat_mod
 from logiq import component_db
+from logiq import compliance as compliance_mod
+from logiq import quiz as quiz_mod
+from logiq import public_share as share_mod
+from logiq.logbook import build_logbook_pdf
 from fastapi import Cookie, Depends
 try:
     from logiq.whatsapp import router as whatsapp_router
@@ -565,6 +569,9 @@ class ComponentPayload(BaseModel):
     custom_name: str = ""
     quantity: int = 1
     notes: str = ""
+    unit_price_bdt: float | None = None
+    vendor: str = ""
+    purchased_at: str = ""
 
 
 @app.post("/api/drones/{drone_id}/components")
@@ -591,6 +598,16 @@ def delete_drone_component(component_id: str, user=Depends(current_user)):
     return {"ok": True}
 
 
+@app.get("/api/drones/{drone_id}/cost")
+def drone_cost(drone_id: str, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    return hw_mod.total_build_cost(drone_id)
+
+
 @app.get("/api/drones/{drone_id}/compatibility")
 def drone_compatibility(drone_id: str, user=Depends(current_user)):
     if not user:
@@ -604,6 +621,148 @@ def drone_compatibility(drone_id: str, user=Depends(current_user)):
 @app.get("/api/catalog/{component_type}")
 def catalog_search(component_type: str, q: str = "", limit: int = 50):
     return component_db.search(component_type, q, limit)
+
+
+# ---- Compliance ----
+@app.get("/api/compliance/checklist")
+def compliance_checklist():
+    return {"items": compliance_mod.CHECKLIST, "weight_categories": compliance_mod.WEIGHT_CATEGORIES}
+
+
+class CompliancePayload(BaseModel):
+    answers: dict[str, str] = {}
+    drone_weight_g: float | None = None
+
+
+@app.post("/api/compliance/assess")
+def compliance_assess(p: CompliancePayload):
+    return compliance_mod.assess(p.answers, p.drone_weight_g)
+
+
+# ---- Quiz ----
+@app.get("/api/quiz/questions")
+def quiz_questions():
+    return quiz_mod.QUESTIONS
+
+
+class QuizPayload(BaseModel):
+    answers: dict[str, int] = {}  # JSON keys are strings
+
+
+@app.post("/api/quiz/grade")
+def quiz_grade(p: QuizPayload):
+    parsed = {int(k): v for k, v in p.answers.items()}
+    return quiz_mod.grade(parsed)
+
+
+# ---- Logbook ----
+@app.get("/api/logbook.pdf")
+def logbook_pdf(user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    con = get_conn()
+    rows = con.execute("""
+        SELECT f.flown_at, f.file_name, f.firmware, f.duration_s,
+               af.bucket, a.score, l.label
+        FROM flights f
+        LEFT JOIN airframes af ON af.id = f.airframe_id
+        LEFT JOIN anomalies a ON a.flight_id = f.id
+        LEFT JOIN labels l ON l.flight_id = f.id
+        WHERE f.parse_error IS NULL AND f.flown_at IS NOT NULL
+        ORDER BY f.flown_at ASC
+    """).fetchall()
+    con.close()
+    flights = []
+    total_s = 0
+    for r in rows:
+        d = dict(r)
+        total_s += d.get("duration_s") or 0
+        flights.append({
+            "date": d["flown_at"], "file_name": d["file_name"],
+            "firmware": d["firmware"], "duration_s": d["duration_s"] or 0,
+            "airframe": d["bucket"], "anomaly_score": d["score"],
+            "label": d["label"],
+        })
+    pdf = build_logbook_pdf(user.get("display_name") or user["email"], flights, total_s / 3600.0)
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="logiq-logbook.pdf"'})
+
+
+# ---- Public share ----
+class ShareCreate(BaseModel):
+    scope: str = "fleet"
+    target_id: str | None = None
+    ttl_days: int = 365
+
+
+@app.post("/api/share/create")
+def share_create(p: ShareCreate, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    tok = share_mod.create_token(user["id"], p.scope, p.target_id, p.ttl_days)
+    return {"token": tok, "url": f"/p/{tok}"}
+
+
+@app.get("/api/share/list")
+def share_list(user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    return share_mod.list_for_user(user["id"])
+
+
+@app.post("/api/share/revoke/{token}")
+def share_revoke(token: str, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    share_mod.revoke(token)
+    return {"ok": True}
+
+
+@app.get("/p/{token}", response_class=HTMLResponse)
+def public_view(token: str):
+    info = share_mod.resolve(token)
+    if not info:
+        return HTMLResponse("<h2 style='font-family:sans-serif; padding:40px;'>This share link is invalid or expired.</h2>", status_code=404)
+    # Build read-only stats for the user's fleet
+    con = get_conn()
+    user_row = con.execute("SELECT display_name, email, organization FROM users WHERE id = ?", (info["user_id"],)).fetchone()
+    fleet = con.execute("""
+        SELECT COUNT(*) AS n, ROUND(SUM(f.duration_s)/3600.0, 1) AS hrs
+        FROM flights f
+        JOIN users u ON u.fleet_id = f.fleet_id
+        WHERE u.id = ? AND f.parse_error IS NULL
+    """, (info["user_id"],)).fetchone()
+    anoms = con.execute("""
+        SELECT COUNT(*) AS n FROM anomalies a
+        JOIN flights f ON f.id = a.flight_id
+        JOIN users u ON u.fleet_id = f.fleet_id
+        WHERE u.id = ? AND a.is_anomaly = 1
+    """, (info["user_id"],)).fetchone()
+    con.close()
+    name = (user_row["display_name"] or user_row["email"]) if user_row else "Pilot"
+    org = (user_row["organization"] or "") if user_row else ""
+    hrs = (fleet["hrs"] or 0) if fleet else 0
+    html = f"""<!DOCTYPE html><html><head><meta charset=utf-8><title>LogIQ — {name}</title>
+<style>body{{font-family:system-ui,sans-serif;margin:0;background:#f4f6f9;color:#1a1a1a;}}
+.hero{{background:linear-gradient(135deg,#0a6,#084);color:white;padding:40px 24px;text-align:center;}}
+.hero h1{{margin:0;font-size:32px;}} .hero p{{margin:8px 0 0;opacity:0.9;}}
+.stats{{max-width:900px;margin:-30px auto 20px;padding:24px;background:white;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,0.08);display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}}
+.stat{{text-align:center;padding:12px;}}.stat .v{{font-size:36px;font-weight:700;color:#0a6;}}
+.stat .l{{font-size:12px;color:#777;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;}}
+.f{{text-align:center;padding:18px;color:#888;font-size:12px;}}
+</style></head><body>
+<div class="hero">
+  <h1>🚁 {name}</h1>
+  <p>{org or 'UAV Pilot'} · Public fleet snapshot</p>
+</div>
+<div class="stats">
+  <div class="stat"><div class="v">{fleet['n'] if fleet else 0}</div><div class="l">Total flights</div></div>
+  <div class="stat"><div class="v">{hrs}h</div><div class="l">Flight hours</div></div>
+  <div class="stat"><div class="v">{anoms['n'] if anoms else 0}</div><div class="l">Anomalies caught</div></div>
+</div>
+<div class="f">Powered by <a href="/" style="color:#0a6;text-decoration:none;">LogIQ</a> — UAV health analytics</div>
+</body></html>"""
+    return HTMLResponse(html)
 
 
 @app.get("/api/battery/trends")

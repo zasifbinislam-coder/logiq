@@ -233,6 +233,8 @@
     <button class="tab-btn" data-tab="leaderboard" data-en="🥇 Leaderboard" data-bn="🥇 Ranking"></button>
     <button class="tab-btn" data-tab="weather" data-en="🌤️ Weather" data-bn="🌤️ Weather"></button>
     <button class="tab-btn" data-tab="mydrones" data-en="🛩️ My drones" data-bn="🛩️ Amar drone"></button>
+    <button class="tab-btn" data-tab="caab" data-en="📋 CAAB" data-bn="📋 CAAB"></button>
+    <button class="tab-btn" data-tab="quiz" data-en="🎓 Quiz" data-bn="🎓 Quiz"></button>
   </div>
 
   <!-- ====== ANALYZE LOG ====== -->
@@ -500,13 +502,45 @@
     </div>
     <div id="mydrones-content" style="display:none;">
       <div class="card-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
           <h3 style="margin:0;" data-en="My drones" data-bn="Amar drone"></h3>
-          <button class="btn primary" onclick="openNewDroneModal()" data-en="+ New drone build" data-bn="+ Notun drone build"></button>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn" onclick="window.open('/api/logbook.pdf', '_blank')" data-en="📕 Logbook PDF" data-bn="📕 Logbook PDF"></button>
+            <button class="btn" onclick="createShareLink()" data-en="🔗 Share link" data-bn="🔗 Share link"></button>
+            <button class="btn primary" onclick="openNewDroneModal()" data-en="+ New build" data-bn="+ Notun build"></button>
+          </div>
         </div>
-        <p class="sub" style="margin-top:8px;" data-en="Add each drone with all its components — we'll auto-check compatibility." data-bn="Protek drone er component sob add koro — auto compatibility check hobe."></p>
+        <p class="sub" style="margin-top:8px;" data-en="Add each drone with components — auto-check compatibility + total build cost." data-bn="Drone er component add koro — auto compatibility + total cost."></p>
+        <div id="share-link-result" style="font-size:13px; margin-top:6px;"></div>
         <div id="drones-list"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ====== CAAB COMPLIANCE ====== -->
+  <div id="tab-caab" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="CAAB Bangladesh compliance check" data-bn="CAAB Bangladesh compliance check"></h3>
+      <p class="sub" data-en="Civil Aviation Authority Bangladesh — Drone Rules 2020. Answer Yes/No for each item." data-bn="CAAB Drone Rules 2020. Protek item er jonno Yes/No daw."></p>
+      <div style="margin: 10px 0;">
+        <label data-en="Drone AUW (g):" data-bn="Drone AUW (g):" style="font-size:12px; color:var(--muted);"></label>
+        <input type="number" id="caab-weight" placeholder="e.g. 12000" style="width:130px; padding:6px 10px; margin-left:6px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text);">
+        <button class="btn primary" onclick="loadCAAB()" data-en="Re-check" data-bn="Re-check" style="margin-left:6px;"></button>
+      </div>
+      <div id="caab-result"></div>
+    </div>
+  </div>
+
+  <!-- ====== QUIZ ====== -->
+  <div id="tab-quiz" class="tab-panel">
+    <div class="card-section">
+      <h3 data-en="Pilot certification quiz" data-bn="Pilot certification quiz"></h3>
+      <p class="sub" data-en="10 questions across regulations, diagnostics, hardware, and operations. Pass = 70%." data-bn="10 ta question — regulation, diagnostics, hardware, operations. Pass mark 70%."></p>
+      <div id="quiz-list"></div>
+      <div style="text-align:center; margin-top:14px;">
+        <button class="btn primary" onclick="gradeQuiz()" data-en="Submit answers" data-bn="Submit answers"></button>
+      </div>
+      <div id="quiz-result"></div>
     </div>
   </div>
 
@@ -644,6 +678,8 @@ document.querySelectorAll(".tab-btn").forEach(b => {
     if (b.dataset.tab === "leaderboard") loadLeaderboardTab();
     if (b.dataset.tab === "weather") loadWeatherTab();
     if (b.dataset.tab === "mydrones") loadMyDrones();
+    if (b.dataset.tab === "caab") loadCAAB();
+    if (b.dataset.tab === "quiz") loadQuiz();
   });
 });
 
@@ -1384,11 +1420,19 @@ async function loadMyDrones() {
     return;
   }
   wrap.innerHTML = await Promise.all(drones.map(async d => {
-    const comp = await fetchJson("/api/drones/" + d.id + "/compatibility").catch(() => null);
+    const [comp, cost] = await Promise.all([
+      fetchJson("/api/drones/" + d.id + "/compatibility").catch(() => null),
+      fetchJson("/api/drones/" + d.id + "/cost").catch(() => null),
+    ]);
     const compHtml = comp && comp.ok ? renderCompatibility(comp) : "";
+    const costHtml = cost && cost.total_bdt ? `
+      <div style="margin-top:10px; padding:10px 12px; background:var(--good-bg); border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:13px; color:var(--good);">💰 ${currentLang === "bn" ? "Total build cost" : "Total build cost"}</span>
+        <span style="font-weight:700; color:var(--good); font-size:15px;">Tk ${cost.total_bdt.toLocaleString()}</span>
+      </div>` : "";
     return `
       <div style="background:var(--card); border-radius:12px; padding:18px; margin-top:14px; box-shadow:var(--shadow);">
-        <div style="display:flex; justify-content:space-between; align-items:start; gap:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:start; gap:10px; flex-wrap:wrap;">
           <div>
             <h4 style="margin:0;">${d.name}</h4>
             <div style="font-size:12px; color:var(--muted); margin-top:3px;">
@@ -1401,23 +1445,44 @@ async function loadMyDrones() {
             <button class="btn" onclick="deleteDrone('${d.id}')" style="color:var(--critical);">🗑️</button>
           </div>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:8px; margin-top:12px;">
-          ${(d.components || []).map(c => `
-            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:8px; margin-top:12px;">
+          ${(d.components || []).map(c => {
+            const ds = c.specs && c.specs.datasheet_url ? `<a href="${c.specs.datasheet_url}" target="_blank" style="font-size:11px; color:var(--primary); text-decoration:none;">📄 datasheet</a>` : "";
+            const price = c.unit_price_bdt ? `Tk ${(c.unit_price_bdt * (c.quantity || 1)).toLocaleString()}` : "";
+            return `<div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px;">
               <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted); text-transform:uppercase;">
-                <span>${c.type}</span>
+                <span>${c.type}${c.quantity > 1 ? ` ×${c.quantity}` : ""}</span>
                 <button onclick="deleteComponent('${c.id}','${d.id}')" style="background:none; border:none; color:var(--critical); cursor:pointer; font-size:12px;">×</button>
               </div>
               <div style="font-weight:600; font-size:13px; margin:4px 0;">
                 ${c.specs ? c.specs.brand + " " + c.specs.model : (c.custom_name || c.catalog_id || "?")}
               </div>
               ${c.specs ? `<div style="font-size:11px; color:var(--muted);">${formatSpec(c.type, c.specs)}</div>` : ""}
-              ${c.quantity > 1 ? `<div style="font-size:11px; color:var(--muted); margin-top:3px;">qty ${c.quantity}</div>` : ""}
-            </div>`).join("")}
+              <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:11px;">
+                <span>${ds}</span>
+                <span style="color:var(--good); font-weight:600;">${price}</span>
+              </div>
+            </div>`;
+          }).join("")}
         </div>
+        ${costHtml}
         ${compHtml}
       </div>`;
   })).then(html => html.join(""));
+}
+
+async function createShareLink() {
+  if (!currentUser) { alert("Login first"); return; }
+  try {
+    const r = await fetchJson("/api/share/create", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: "fleet", ttl_days: 365 }),
+    });
+    const url = location.origin + r.url;
+    document.getElementById("share-link-result").innerHTML =
+      `<span style="color:var(--good);">✓ Link created:</span> <a href="${url}" target="_blank" style="color:var(--primary);">${url}</a>`;
+    navigator.clipboard.writeText(url).catch(() => {});
+  } catch (e) { alert("Failed: " + e); }
 }
 
 function formatSpec(type, s) {
@@ -1491,11 +1556,93 @@ async function addComponentDialog(droneId) {
   const pick = prompt(`Pick by number:\n\n${list}`);
   const idx = parseInt(pick) - 1;
   if (isNaN(idx) || idx < 0 || idx >= items.length) return;
+  const qty = parseInt(prompt("Quantity?", "1") || "1") || 1;
+  const price = parseFloat(prompt("Unit price (BDT, optional)?", "") || "");
   await fetchJson("/api/drones/" + droneId + "/components", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type, catalog_id: items[idx].id, quantity: 1 }),
+    body: JSON.stringify({
+      type, catalog_id: items[idx].id, quantity: qty,
+      unit_price_bdt: isNaN(price) ? null : price,
+    }),
   });
   loadMyDrones();
+}
+
+// === CAAB ===
+async function loadCAAB() {
+  const weight = parseFloat(document.getElementById("caab-weight").value) || null;
+  const cl = await fetchJson("/api/compliance/checklist");
+  const ans = (window._caabAns ||= {});
+  const html = cl.items.map(c => {
+    const cur = ans[c.id] || "";
+    return `<div class="quickcheck-q">
+      <div class="qtxt">${currentLang === "bn" ? c.bn : c.en}</div>
+      <div class="qbtns">
+        <button class="qbtn ${cur === 'yes' ? 'selected yes' : ''}" onclick="caabSel('${c.id}','yes',this)">Yes</button>
+        <button class="qbtn ${cur === 'no' ? 'selected no' : ''}" onclick="caabSel('${c.id}','no',this)">No</button>
+        <button class="qbtn ${cur === 'na' ? 'selected' : ''}" onclick="caabSel('${c.id}','na',this)" style="opacity:0.7;">N/A</button>
+      </div>
+    </div>`;
+  }).join("");
+  const r = await fetchJson("/api/compliance/assess", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers: ans, drone_weight_g: weight }),
+  });
+  const wc = r.weight_class;
+  document.getElementById("caab-result").innerHTML = `
+    <div style="background:var(--card); border-radius:10px; padding:14px; margin-bottom:14px; border-left:4px solid var(--${r.status === 'good' ? 'good' : r.status === 'fair' ? 'fair' : 'critical'});">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <b>Weight class ${wc.key} — ${currentLang === "bn" ? wc.label_bn : wc.label_en}</b>
+          <div style="font-size:12px; color:var(--muted);">${wc.min_kg}–${wc.max_kg} kg ·
+            ${wc.registration_required ? (currentLang === "bn" ? "Registration lagbe" : "Registration required") : "No registration"} ·
+            ${wc.license_required ? (currentLang === "bn" ? "License lagbe" : "License required") : "No license"}</div>
+        </div>
+        <span class="status-pill ${r.status}">${r.score_pct}%</span>
+      </div>
+      <div style="margin-top:10px; font-size:13px;">${currentLang === "bn" ? r.summary_bn : r.summary_en}</div>
+    </div>
+    ${html}`;
+}
+function caabSel(id, val) {
+  (window._caabAns ||= {})[id] = val;
+  loadCAAB();
+}
+
+// === QUIZ ===
+async function loadQuiz() {
+  const qs = await fetchJson("/api/quiz/questions");
+  window._quizQs = qs;
+  document.getElementById("quiz-list").innerHTML = qs.map((q, i) => {
+    return `<div class="quickcheck-q" style="margin-bottom:14px;">
+      <div class="qtxt"><b>Q${i+1}.</b> ${currentLang === "bn" ? q.bn : q.en}</div>
+      <div style="display:flex; flex-direction:column; gap:5px; margin-top:8px;">
+        ${q.options.map((opt, oi) => `
+          <label style="font-size:13px; display:flex; gap:6px; cursor:pointer;">
+            <input type="radio" name="q${q.id}" value="${oi}" onchange="window._quizAns[${q.id}]=${oi}">
+            <span>${opt}</span>
+          </label>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+  window._quizAns = {};
+  document.getElementById("quiz-result").innerHTML = "";
+}
+async function gradeQuiz() {
+  const ans = window._quizAns || {};
+  if (!Object.keys(ans).length) { alert("Answer at least one question"); return; }
+  const stringAnswers = Object.fromEntries(Object.entries(ans).map(([k,v]) => [String(k), v]));
+  const r = await fetchJson("/api/quiz/grade", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers: stringAnswers }),
+  });
+  const topicRows = Object.entries(r.by_topic).map(([t, v]) => `<div style="margin:6px 0;"><b>${t}:</b> ${v.correct}/${v.total} (${v.pct}%)</div>`).join("");
+  document.getElementById("quiz-result").innerHTML = `
+    <div style="background:var(--card); border-radius:12px; padding:20px; margin-top:14px; text-align:center; box-shadow:var(--shadow);">
+      <div class="score-circle ${r.pass ? 'good' : 'poor'}">${r.score_pct}</div>
+      <div style="font-size:16px; margin-top:10px;">${currentLang === "bn" ? r.verdict_bn : r.verdict_en}</div>
+      <div style="text-align:left; max-width:340px; margin:14px auto; font-size:13px;">${topicRows}</div>
+    </div>`;
 }
 
 // === New-tab loaders ===

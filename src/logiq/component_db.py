@@ -75,6 +75,48 @@ FLIGHT_CONTROLLERS = [
 ]
 
 
+# Datasheet / spec page URLs for each catalog entry
+DATASHEETS = {
+    "tmotor_f60_pro_v_1750":  "https://store.tmotor.com/product/f60-pro-v-1750kv-motor.html",
+    "tmotor_f40_pro_iv_2400": "https://store.tmotor.com/product/f40-pro-iv-2400kv-motor.html",
+    "iflight_xing_2207_1855": "https://shop.iflight.com/xing-2207-motor",
+    "emax_mt2204_2300":       "https://emax-usa.com/products/mt2204-2300kv",
+    "dji_2212_920":           "https://www.dji.com/uk/products/components",
+    "sunnysky_v2806_740":     "https://www.sunnyskyusa.com/v2806-740kv",
+    "tmotor_mn5008_400":      "https://store.tmotor.com/product/mn5008-kv400-motor.html",
+    "tmotor_u8ii_100":        "https://store.tmotor.com/product/u8ii-kv100.html",
+    "eaglepower_6215_240":    "https://eaglepower.com/product/6215-240kv-motor",
+    "hobbywing_xrotor_40a":   "https://www.hobbywing.com/products/xrotor-40a",
+    "holybro_tekko32_65a":    "https://holybro.com/products/tekko32-f3-65a",
+    "tmotor_f45a_v2":         "https://store.tmotor.com/product/f45a-v2-esc.html",
+    "tmotor_alpha_60a_hv":    "https://store.tmotor.com/product/alpha-60a-hv-esc.html",
+    "aikon_ak32_35a":         "https://www.aikon-electronic.com/ak32-35a",
+    "tmotor_70a_6s":          "https://store.tmotor.com/product/70a-multi-rotor-esc.html",
+    "hqprop_5x4_3x3":         "https://www.hqprop.com/5x4-3x3-v1s",
+    "gemfan_5152s":           "https://www.gemfanhobby.com/5152s",
+    "dal_cyclone_t5046":      "https://www.dalprop.com/t5046c",
+    "dji_1045":               "https://www.dji.com/uk/products/components",
+    "tmotor_p15x5":           "https://store.tmotor.com/product/p15x5-carbon.html",
+    "tmotor_carbon_22x66":    "https://store.tmotor.com/product/g22x66-carbon.html",
+    "tattu_rline_1300_4s_95c":   "https://www.gensace.de/tattu-r-line-1300mah-4s-95c",
+    "cnhl_black_1500_4s_100c":   "https://www.china-hobbyline.com/black-series-1500-4s-100c",
+    "gnb_1300_6s_120c":          "https://www.gnbattery.com/6s-1300-120c",
+    "tattu_5200_4s_15c":         "https://www.gensace.de/tattu-5200mah-4s-15c",
+    "tattu_plus_22000_6s_25c":   "https://www.gensace.de/tattu-plus-22000-6s-25c",
+    "tattu_plus_62000_6s2p_15c": "https://www.gensace.de/tattu-plus-62000mah-6s2p-15c",
+    "pixhawk_cube_orange":       "https://docs.cubepilot.org/user-guides/cube-orange",
+    "pixhawk_6c":                "https://holybro.com/products/pixhawk-6c",
+    "matek_h743_wing":           "https://www.mateksys.com/?portfolio=h743-wing",
+    "speedybee_f7v3":            "https://www.speedybee.com/f7-v3",
+}
+
+
+# Inject datasheet_url into each entry
+for _cat in (MOTORS, ESCS, PROPS, BATTERIES, FLIGHT_CONTROLLERS):
+    for _item in _cat:
+        _item["datasheet_url"] = DATASHEETS.get(_item["id"])
+
+
 CATALOG = {
     "motor":   MOTORS,
     "esc":     ESCS,
