@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.env
+
+# --- Project data (kept local) ---
+data/logiq.db
+data/uploads/
+data/photos/
+data/parquet/*.csv
+data/parquet/*.parquet
+data/parquet/labeled.csv
+
+# --- Generated reports ---
+reports/*.html
+reports/*.pdf
+reports/*.log
+!reports/.gitkeep
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+*.tmp
+*.tmp.*
+
+# --- Build outputs ---
+dist/
+build/
+
+# --- Secrets ---
+*.pem
+*.key
+.env.local
+.env.production
