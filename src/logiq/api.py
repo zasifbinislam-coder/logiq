@@ -47,6 +47,11 @@ from logiq.autotag import suggest_tag
 from logiq.leaderboard import airframe_leaderboard
 from logiq.weather import fetch_weather, correlate_with_anomalies
 from logiq.insurance_pdf import build_insurance_pdf
+from logiq import users as users_mod
+from logiq import hardware as hw_mod
+from logiq import compatibility as compat_mod
+from logiq import component_db
+from fastapi import Cookie, Depends
 try:
     from logiq.whatsapp import router as whatsapp_router
 except Exception:
@@ -54,6 +59,8 @@ except Exception:
 
 init_labels()
 init_maint()
+users_mod.init()
+hw_mod.init()
 
 
 BASE_DIR = Path(r"C:\Users\zasif bin islam\Desktop\LogIQ")
@@ -424,6 +431,179 @@ def compare_flights(a: str, b: str):
         "score_delta": B["overall_score"] - A["overall_score"],
         "category_diff": cat_diff,
     }
+
+
+def current_user(logiq_token: str | None = Cookie(default=None)):
+    return users_mod.get_user_by_token(logiq_token)
+
+
+class SignupPayload(BaseModel):
+    email: str
+    password: str
+    display_name: str = ""
+    phone: str = ""
+    organization: str = ""
+
+
+class LoginPayload(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/signup")
+def signup(p: SignupPayload):
+    try:
+        u = users_mod.create_user(p.email, p.password, p.display_name, p.phone, p.organization)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    token = users_mod.create_session(u["id"])
+    resp = JSONResponse({"user": u})
+    resp.set_cookie("logiq_token", token, max_age=30*24*3600, httponly=True, samesite="lax")
+    return resp
+
+
+@app.post("/api/auth/login")
+def login(p: LoginPayload):
+    u = users_mod.authenticate(p.email, p.password)
+    if not u:
+        raise HTTPException(401, "invalid credentials")
+    token = users_mod.create_session(u["id"])
+    resp = JSONResponse({"user": u})
+    resp.set_cookie("logiq_token", token, max_age=30*24*3600, httponly=True, samesite="lax")
+    return resp
+
+
+@app.post("/api/auth/logout")
+def logout(logiq_token: str | None = Cookie(default=None)):
+    if logiq_token:
+        users_mod.delete_session(logiq_token)
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie("logiq_token")
+    return resp
+
+
+@app.get("/api/auth/me")
+def me(user=Depends(current_user)):
+    return user or {}
+
+
+class ProfilePayload(BaseModel):
+    display_name: str | None = None
+    phone: str | None = None
+    organization: str | None = None
+    country: str | None = None
+
+
+@app.put("/api/auth/profile")
+def update_profile_endpoint(p: ProfilePayload, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    return users_mod.update_profile(user["id"], display_name=p.display_name, phone=p.phone,
+                                    organization=p.organization, country=p.country)
+
+
+# ---- Drone hardware profiles ----
+
+class AirframePayload(BaseModel):
+    name: str
+    description: str = ""
+    frame_class: str = "quad"
+    frame_size_mm: int | None = None
+    motor_count: int = 4
+    auw_g: float | None = None
+    notes: str = ""
+
+
+@app.get("/api/drones")
+def list_drones(user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    return hw_mod.list_airframes(user["id"])
+
+
+@app.post("/api/drones")
+def create_drone(p: AirframePayload, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    return hw_mod.create_airframe(user["id"], **p.model_dump())
+
+
+@app.get("/api/drones/{drone_id}")
+def get_drone(drone_id: str, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    return af
+
+
+@app.put("/api/drones/{drone_id}")
+def update_drone(drone_id: str, p: AirframePayload, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    return hw_mod.update_airframe(drone_id, **p.model_dump())
+
+
+@app.delete("/api/drones/{drone_id}")
+def delete_drone(drone_id: str, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    hw_mod.delete_airframe(drone_id)
+    return {"ok": True}
+
+
+class ComponentPayload(BaseModel):
+    type: str
+    catalog_id: str | None = None
+    custom_name: str = ""
+    quantity: int = 1
+    notes: str = ""
+
+
+@app.post("/api/drones/{drone_id}/components")
+def add_drone_component(drone_id: str, p: ComponentPayload, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    return hw_mod.add_component(drone_id, **p.model_dump())
+
+
+@app.delete("/api/components/{component_id}")
+def delete_drone_component(component_id: str, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    c = hw_mod.get_component(component_id)
+    if not c:
+        raise HTTPException(404, "component not found")
+    af = hw_mod.get_airframe(c["airframe_id"])
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(403, "not your component")
+    hw_mod.delete_component(component_id)
+    return {"ok": True}
+
+
+@app.get("/api/drones/{drone_id}/compatibility")
+def drone_compatibility(drone_id: str, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    return compat_mod.analyze(drone_id)
+
+
+@app.get("/api/catalog/{component_type}")
+def catalog_search(component_type: str, q: str = "", limit: int = 50):
+    return component_db.search(component_type, q, limit)
 
 
 @app.get("/api/battery/trends")

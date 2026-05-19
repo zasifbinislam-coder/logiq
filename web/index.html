@@ -207,6 +207,8 @@
   <h1>🚁 LogIQ</h1>
   <span class="tag" data-en="UAV drone health analytics" data-bn="Drone health analytics"></span>
   <div class="header-right">
+    <span id="auth-user" style="font-size:12px; margin-right:8px;"></span>
+    <button class="icon-btn" id="auth-btn" onclick="openAuth()" data-en="👤 Login" data-bn="👤 Login"></button>
     <button class="icon-btn" id="theme-toggle" title="Toggle dark mode">🌙</button>
     <button class="icon-btn" onclick="openOnboarding()" data-en="?" data-bn="?">?</button>
     <div class="lang-toggle">
@@ -230,6 +232,7 @@
     <button class="tab-btn" data-tab="components" data-en="🧰 Components" data-bn="🧰 Component"></button>
     <button class="tab-btn" data-tab="leaderboard" data-en="🥇 Leaderboard" data-bn="🥇 Ranking"></button>
     <button class="tab-btn" data-tab="weather" data-en="🌤️ Weather" data-bn="🌤️ Weather"></button>
+    <button class="tab-btn" data-tab="mydrones" data-en="🛩️ My drones" data-bn="🛩️ Amar drone"></button>
   </div>
 
   <!-- ====== ANALYZE LOG ====== -->
@@ -326,6 +329,16 @@
       <div class="advanced-block" id="advanced-block">
         <h4 style="margin-top:0" data-en="Raw feature values" data-bn="Raw feature value"></h4>
         <div class="feat-grid" id="feat-grid"></div>
+      </div>
+
+      <div class="card-section" id="tag-card" style="margin-top:18px; text-align:center;">
+        <h3 style="margin:0 0 10px;" data-en="🏷️ Tag this flight" data-bn="🏷️ Ei flight tag koro"></h3>
+        <p class="sub" data-en="Help train the model — tag what really happened on this flight." data-bn="Model train e shahajjo koro — flight e ki holo tag dao."></p>
+        <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; align-items:center;">
+          <select id="label-select" onchange="saveLabel()" style="padding:8px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text); font-size:13px; min-width:280px;"></select>
+          <button class="btn" onclick="suggestTag()" data-en="🤖 Auto-suggest" data-bn="🤖 Auto-suggest"></button>
+        </div>
+        <p id="label-status" style="margin-top:8px; font-size:12px; color:var(--muted);"></p>
       </div>
     </section>
   </div>
@@ -478,6 +491,25 @@
     </div>
   </div>
 
+  <!-- ====== MY DRONES ====== -->
+  <div id="tab-mydrones" class="tab-panel">
+    <div id="mydrones-loggedout" class="card-section" style="text-align:center; display:none;">
+      <h3 data-en="Login to manage your drones" data-bn="Tomar drone manage korte login koro"></h3>
+      <p class="sub" data-en="Add your drone builds, components, and run automatic compatibility checks." data-bn="Drone build add koro, components add koro, automatic compatibility check pao."></p>
+      <button class="btn primary" onclick="openAuth()" data-en="👤 Login / Signup" data-bn="👤 Login / Signup"></button>
+    </div>
+    <div id="mydrones-content" style="display:none;">
+      <div class="card-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;" data-en="My drones" data-bn="Amar drone"></h3>
+          <button class="btn primary" onclick="openNewDroneModal()" data-en="+ New drone build" data-bn="+ Notun drone build"></button>
+        </div>
+        <p class="sub" style="margin-top:8px;" data-en="Add each drone with all its components — we'll auto-check compatibility." data-bn="Protek drone er component sob add koro — auto compatibility check hobe."></p>
+        <div id="drones-list"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ====== CALENDAR ====== -->
   <div id="tab-calendar" class="tab-panel">
     <div class="card-section">
@@ -498,6 +530,50 @@
     LogIQ v0.0.4 · <a href="/reports/fleet_trends.html" target="_blank" style="color:var(--muted)">Trends</a> · <a href="/reports/predictive.html" target="_blank" style="color:var(--muted)">Predictive</a>
   </p>
 </main>
+
+<!-- Auth modal -->
+<div class="modal-backdrop" id="auth-modal">
+  <div class="modal-content" style="text-align:left; min-width:380px;">
+    <h3 data-en="Sign in / sign up" data-bn="Sign in / sign up"></h3>
+    <div style="display:flex; gap:6px; margin:14px 0;">
+      <button id="auth-tab-login" class="btn primary" onclick="setAuthTab('login')" data-en="Login" data-bn="Login"></button>
+      <button id="auth-tab-signup" class="btn" onclick="setAuthTab('signup')" data-en="Sign up" data-bn="Sign up"></button>
+    </div>
+    <input type="email" id="auth-email" placeholder="Email" style="width:100%; padding:9px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+    <input type="password" id="auth-password" placeholder="Password (≥6 chars)" style="width:100%; padding:9px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+    <div id="auth-extra" style="display:none;">
+      <input type="text" id="auth-name" placeholder="Display name" style="width:100%; padding:9px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+      <input type="tel" id="auth-phone" placeholder="Phone (optional)" style="width:100%; padding:9px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+      <input type="text" id="auth-org" placeholder="Organization (optional)" style="width:100%; padding:9px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+    </div>
+    <div id="auth-error" style="color:var(--critical); font-size:12px; min-height:14px; margin-bottom:8px;"></div>
+    <button class="btn primary" id="auth-submit" onclick="submitAuth()" style="width:100%;" data-en="Continue" data-bn="Continue"></button>
+    <button class="btn" onclick="closeAuth()" style="width:100%; margin-top:6px;" data-en="Cancel" data-bn="Cancel"></button>
+  </div>
+</div>
+
+<!-- New drone modal -->
+<div class="modal-backdrop" id="newdrone-modal">
+  <div class="modal-content" style="text-align:left; min-width:420px;">
+    <h3 data-en="New drone build" data-bn="Notun drone build"></h3>
+    <input type="text" id="nd-name" placeholder="Build name (e.g. FireGuard Mk1)" style="width:100%; padding:9px 12px; margin:8px 0; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+    <select id="nd-class" style="width:100%; padding:9px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+      <option value="quad">Quadcopter (4 motors)</option>
+      <option value="hex">Hexacopter (6)</option>
+      <option value="octo">Octocopter (8)</option>
+      <option value="12">Y12 / X12 (12)</option>
+      <option value="plane">Plane</option>
+      <option value="vtol">VTOL</option>
+    </select>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <input type="number" id="nd-size" placeholder="Frame size (mm)" style="padding:9px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+      <input type="number" id="nd-auw" placeholder="AUW (grams)" style="padding:9px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);">
+    </div>
+    <textarea id="nd-desc" rows="2" placeholder="Description (optional)" style="width:100%; padding:9px 12px; margin-top:8px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text);"></textarea>
+    <button class="btn primary" onclick="submitNewDrone()" style="width:100%; margin-top:10px;" data-en="Create build" data-bn="Build create koro"></button>
+    <button class="btn" onclick="closeNewDrone()" style="width:100%; margin-top:6px;" data-en="Cancel" data-bn="Cancel"></button>
+  </div>
+</div>
 
 <!-- Onboarding modal -->
 <div class="modal-backdrop" id="onboard">
@@ -567,6 +643,7 @@ document.querySelectorAll(".tab-btn").forEach(b => {
     if (b.dataset.tab === "components") loadComponentsTab();
     if (b.dataset.tab === "leaderboard") loadLeaderboardTab();
     if (b.dataset.tab === "weather") loadWeatherTab();
+    if (b.dataset.tab === "mydrones") loadMyDrones();
   });
 });
 
@@ -1227,6 +1304,200 @@ function filterByDate(ds) {
   loadFlights();
 }
 
+// === AUTH ===
+let currentUser = null;
+let authTab = "login";
+function setAuthTab(t) {
+  authTab = t;
+  document.getElementById("auth-tab-login").className = t === "login" ? "btn primary" : "btn";
+  document.getElementById("auth-tab-signup").className = t === "signup" ? "btn primary" : "btn";
+  document.getElementById("auth-extra").style.display = t === "signup" ? "block" : "none";
+}
+function openAuth() { document.getElementById("auth-modal").classList.add("open"); setAuthTab("login"); document.getElementById("auth-error").textContent = ""; }
+function closeAuth() { document.getElementById("auth-modal").classList.remove("open"); }
+async function submitAuth() {
+  const email = document.getElementById("auth-email").value.trim();
+  const pw = document.getElementById("auth-password").value;
+  const errEl = document.getElementById("auth-error");
+  errEl.textContent = "";
+  const body = { email, password: pw };
+  if (authTab === "signup") {
+    body.display_name = document.getElementById("auth-name").value;
+    body.phone = document.getElementById("auth-phone").value;
+    body.organization = document.getElementById("auth-org").value;
+  }
+  try {
+    const r = await fetch("/api/auth/" + authTab, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) {
+      const t = await r.text();
+      errEl.textContent = "✗ " + (t || "auth failed");
+      return;
+    }
+    const d = await r.json();
+    currentUser = d.user || d;
+    refreshAuthUI();
+    closeAuth();
+    if (document.querySelector("[data-tab=mydrones]").classList.contains("active")) loadMyDrones();
+  } catch (e) { errEl.textContent = "✗ " + e; }
+}
+async function logout() {
+  await fetch("/api/auth/logout", { method: "POST" });
+  currentUser = null;
+  refreshAuthUI();
+  loadMyDrones();
+}
+async function checkAuth() {
+  try {
+    const r = await fetchJson("/api/auth/me");
+    currentUser = r && r.id ? r : null;
+  } catch (e) { currentUser = null; }
+  refreshAuthUI();
+}
+function refreshAuthUI() {
+  const btn = document.getElementById("auth-btn");
+  const userSpan = document.getElementById("auth-user");
+  if (currentUser) {
+    btn.textContent = currentLang === "bn" ? "🚪 Logout" : "🚪 Logout";
+    btn.onclick = logout;
+    userSpan.textContent = "👋 " + (currentUser.display_name || currentUser.email);
+  } else {
+    btn.textContent = currentLang === "bn" ? "👤 Login" : "👤 Login";
+    btn.onclick = openAuth;
+    userSpan.textContent = "";
+  }
+}
+
+// === MY DRONES ===
+let drones = [];
+async function loadMyDrones() {
+  if (!currentUser) {
+    document.getElementById("mydrones-loggedout").style.display = "block";
+    document.getElementById("mydrones-content").style.display = "none";
+    return;
+  }
+  document.getElementById("mydrones-loggedout").style.display = "none";
+  document.getElementById("mydrones-content").style.display = "block";
+  drones = await fetchJson("/api/drones");
+  const wrap = document.getElementById("drones-list");
+  if (!drones.length) {
+    wrap.innerHTML = `<div style="text-align:center; color:var(--muted); padding:30px;">${currentLang === "bn" ? "Ekhono kono drone add nai. Notun drone build click koro." : "No drones yet. Click New drone build above."}</div>`;
+    return;
+  }
+  wrap.innerHTML = await Promise.all(drones.map(async d => {
+    const comp = await fetchJson("/api/drones/" + d.id + "/compatibility").catch(() => null);
+    const compHtml = comp && comp.ok ? renderCompatibility(comp) : "";
+    return `
+      <div style="background:var(--card); border-radius:12px; padding:18px; margin-top:14px; box-shadow:var(--shadow);">
+        <div style="display:flex; justify-content:space-between; align-items:start; gap:10px;">
+          <div>
+            <h4 style="margin:0;">${d.name}</h4>
+            <div style="font-size:12px; color:var(--muted); margin-top:3px;">
+              ${d.frame_class} · ${d.motor_count} motors · ${d.auw_g || "?"}g AUW · ${d.frame_size_mm || "?"}mm
+            </div>
+            ${d.description ? `<div style="font-size:13px; margin-top:6px;">${d.description}</div>` : ""}
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn" onclick="addComponentDialog('${d.id}')" data-en="+ Component" data-bn="+ Component">+ Component</button>
+            <button class="btn" onclick="deleteDrone('${d.id}')" style="color:var(--critical);">🗑️</button>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:8px; margin-top:12px;">
+          ${(d.components || []).map(c => `
+            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px;">
+              <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted); text-transform:uppercase;">
+                <span>${c.type}</span>
+                <button onclick="deleteComponent('${c.id}','${d.id}')" style="background:none; border:none; color:var(--critical); cursor:pointer; font-size:12px;">×</button>
+              </div>
+              <div style="font-weight:600; font-size:13px; margin:4px 0;">
+                ${c.specs ? c.specs.brand + " " + c.specs.model : (c.custom_name || c.catalog_id || "?")}
+              </div>
+              ${c.specs ? `<div style="font-size:11px; color:var(--muted);">${formatSpec(c.type, c.specs)}</div>` : ""}
+              ${c.quantity > 1 ? `<div style="font-size:11px; color:var(--muted); margin-top:3px;">qty ${c.quantity}</div>` : ""}
+            </div>`).join("")}
+        </div>
+        ${compHtml}
+      </div>`;
+  })).then(html => html.join(""));
+}
+
+function formatSpec(type, s) {
+  if (type === "motor") return `${s.kv}KV · max ${s.max_current_a}A · ${s.battery_cells_min}-${s.battery_cells_max}S`;
+  if (type === "esc") return `max ${s.max_current_a}A · ${s.voltage_cells_min}-${s.voltage_cells_max}S`;
+  if (type === "prop") return `${s.diameter_in}" × ${s.pitch_in}" · ${s.blades} blade`;
+  if (type === "battery") return `${s.cells}S ${s.capacity_mah}mAh ${s.c_rating}C · ${s.weight_g}g`;
+  if (type === "fc") return `${s.mcu} · IMU×${s.imu_count}`;
+  return "";
+}
+
+function renderCompatibility(c) {
+  const checks = c.checks.map(ch => {
+    const icon = ch.ok ? "✅" : "❌";
+    return `<div style="display:flex; gap:8px; padding:4px 0; font-size:12px;">${icon}<span><b>${ch.label}:</b> ${ch.detail_en}</span></div>`;
+  }).join("");
+  const extras = [];
+  if (c.twr_estimated) extras.push(`<b>TWR:</b> ${c.twr_estimated}`);
+  if (c.hover_time_min_estimated) extras.push(`<b>Hover est:</b> ${c.hover_time_min_estimated} min`);
+  return `
+    <div style="margin-top:14px; padding:12px; background:var(--bg); border:1px solid var(--border); border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-weight:600;">${currentLang === "bn" ? "🔧 Compatibility check" : "🔧 Compatibility check"}</span>
+        <span class="status-pill ${c.status}">${c.score_pct}% ${c.status.toUpperCase()}</span>
+      </div>
+      <div style="font-size:13px; margin-bottom:8px;">${currentLang === "bn" ? c.summary_bn : c.summary_en}</div>
+      ${checks}
+      ${extras.length ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-size:12px;">${extras.join(" · ")}</div>` : ""}
+    </div>`;
+}
+
+function openNewDroneModal() { document.getElementById("newdrone-modal").classList.add("open"); }
+function closeNewDrone() { document.getElementById("newdrone-modal").classList.remove("open"); }
+async function submitNewDrone() {
+  const name = document.getElementById("nd-name").value.trim();
+  if (!name) { alert("Name required"); return; }
+  const cls = document.getElementById("nd-class").value;
+  const motorMap = { quad: 4, hex: 6, octo: 8, "12": 12, plane: 1, vtol: 5 };
+  const body = {
+    name, frame_class: cls, motor_count: motorMap[cls] || 4,
+    frame_size_mm: parseInt(document.getElementById("nd-size").value) || null,
+    auw_g: parseFloat(document.getElementById("nd-auw").value) || null,
+    description: document.getElementById("nd-desc").value,
+  };
+  await fetchJson("/api/drones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  closeNewDrone();
+  document.getElementById("nd-name").value = "";
+  document.getElementById("nd-size").value = "";
+  document.getElementById("nd-auw").value = "";
+  document.getElementById("nd-desc").value = "";
+  loadMyDrones();
+}
+
+async function deleteDrone(id) {
+  if (!confirm(currentLang === "bn" ? "Are you sure? Drone delete hobe." : "Delete this drone build?")) return;
+  await fetch("/api/drones/" + id, { method: "DELETE" });
+  loadMyDrones();
+}
+
+async function deleteComponent(cid, did) {
+  await fetch("/api/components/" + cid, { method: "DELETE" });
+  loadMyDrones();
+}
+
+async function addComponentDialog(droneId) {
+  const type = prompt("Component type? (motor / esc / prop / battery / fc)");
+  if (!type) return;
+  const items = await fetchJson("/api/catalog/" + type);
+  if (!items.length) { alert("No items in catalog"); return; }
+  const list = items.map((i, idx) => `${idx + 1}. ${i.brand} ${i.model}`).join("\n");
+  const pick = prompt(`Pick by number:\n\n${list}`);
+  const idx = parseInt(pick) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= items.length) return;
+  await fetchJson("/api/drones/" + droneId + "/components", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, catalog_id: items[idx].id, quantity: 1 }),
+  });
+  loadMyDrones();
+}
+
 // === New-tab loaders ===
 async function loadBatteryTab() {
   const data = await fetchJson("/api/battery/trends");
@@ -1322,6 +1593,7 @@ if ("serviceWorker" in navigator) {
 
 // === Init ===
 applyLang();
+checkAuth();
 loadStats().then(loadFlights).catch(e => console.error(e));
 loadQuickQuestions();
 
