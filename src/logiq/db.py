@@ -15,11 +15,14 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import os
 import sqlite3
 import sys
 import uuid
 
-DB_PATH = r"C:\Users\zasif bin islam\Desktop\LogIQ\data\logiq.db"
+# DB_PATH defaults to the workstation install path; override with the
+# LOGIQ_DB_PATH env var for tests / alt environments.
+DB_PATH = os.environ.get("LOGIQ_DB_PATH", r"C:\Users\zasif bin islam\Desktop\LogIQ\data\logiq.db")
 
 
 SCHEMA = """

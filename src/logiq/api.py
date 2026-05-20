@@ -19,6 +19,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 import json
+import os
 import uuid
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
@@ -26,7 +27,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from logiq.db import get_conn, DB_PATH, folder_label, upsert_airframe
+from logiq.db import get_conn, DB_PATH, folder_label, upsert_airframe, init_schema
 from logiq.extract import extract_features
 from logiq.verdict import compute_verdict
 from logiq.pdf_report import build_pdf
@@ -61,13 +62,23 @@ try:
 except Exception:
     whatsapp_router = None
 
+# Core SQL schema (fleets / airframes / flights / features / anomalies).
+# Without this, a fresh container hits "no such table: fleets" on first
+# signup. Idempotent — safe to call on every boot.
+init_schema()
 init_labels()
 init_maint()
 users_mod.init()
 hw_mod.init()
 
+# Production-only cookie hardening — set LOGIQ_COOKIE_SECURE=1 when deployed
+# behind HTTPS so session cookies aren't sent over plain HTTP.
+_COOKIE_SECURE = os.environ.get("LOGIQ_COOKIE_SECURE", "").lower() in ("1", "true", "yes")
 
-BASE_DIR = Path(r"C:\Users\zasif bin islam\Desktop\LogIQ")
+
+# Derive the repo root from this file's location so the app is portable
+# across machines/drives. Override with LOGIQ_BASE_DIR if needed.
+BASE_DIR = Path(os.environ.get("LOGIQ_BASE_DIR") or Path(__file__).resolve().parents[2])
 REPORTS_DIR = BASE_DIR / "reports"
 UPLOADS_DIR = BASE_DIR / "data" / "uploads"
 WEB_DIR = BASE_DIR / "web"
@@ -462,7 +473,7 @@ def signup(p: SignupPayload):
         raise HTTPException(400, str(e))
     token = users_mod.create_session(u["id"])
     resp = JSONResponse({"user": u})
-    resp.set_cookie("logiq_token", token, max_age=30*24*3600, httponly=True, samesite="lax")
+    resp.set_cookie("logiq_token", token, max_age=30*24*3600, httponly=True, samesite="lax", secure=_COOKIE_SECURE)
     return resp
 
 
@@ -473,7 +484,7 @@ def login(p: LoginPayload):
         raise HTTPException(401, "invalid credentials")
     token = users_mod.create_session(u["id"])
     resp = JSONResponse({"user": u})
-    resp.set_cookie("logiq_token", token, max_age=30*24*3600, httponly=True, samesite="lax")
+    resp.set_cookie("logiq_token", token, max_age=30*24*3600, httponly=True, samesite="lax", secure=_COOKIE_SECURE)
     return resp
 
 
@@ -532,26 +543,9 @@ def create_drone(p: AirframePayload, user=Depends(current_user)):
     return hw_mod.create_airframe(user["id"], **p.model_dump())
 
 
-@app.get("/api/drones/{drone_id}")
-def get_drone(drone_id: str, user=Depends(current_user)):
-    if not user:
-        raise HTTPException(401, "login required")
-    af = hw_mod.get_airframe(drone_id)
-    if not af or af["user_id"] != user["id"]:
-        raise HTTPException(404, "drone not found")
-    return af
-
-
-@app.put("/api/drones/{drone_id}")
-def update_drone(drone_id: str, p: AirframePayload, user=Depends(current_user)):
-    if not user:
-        raise HTTPException(401, "login required")
-    af = hw_mod.get_airframe(drone_id)
-    if not af or af["user_id"] != user["id"]:
-        raise HTTPException(404, "drone not found")
-    return hw_mod.update_airframe(drone_id, **p.model_dump())
-
-
+# Literal /api/drones/* routes MUST be declared before the /{drone_id}
+# placeholder route — otherwise FastAPI matches "templates" / "from-template"
+# as a drone_id and the literal handler is never reached.
 @app.get("/api/drones/templates")
 def list_drone_templates():
     return [{"key": k, **{kk: vv for kk, vv in v.items() if kk != "components"},
@@ -572,6 +566,26 @@ def create_drone_from_template(p: TemplateInstall, user=Depends(current_user)):
         return hw_mod.create_from_template(user["id"], p.template_key, p.custom_name)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.get("/api/drones/{drone_id}")
+def get_drone(drone_id: str, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    return af
+
+
+@app.put("/api/drones/{drone_id}")
+def update_drone(drone_id: str, p: AirframePayload, user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "login required")
+    af = hw_mod.get_airframe(drone_id)
+    if not af or af["user_id"] != user["id"]:
+        raise HTTPException(404, "drone not found")
+    return hw_mod.update_airframe(drone_id, **p.model_dump())
 
 
 @app.delete("/api/drones/{drone_id}")
@@ -1208,4 +1222,11 @@ def index():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("logiq.api:app", host="127.0.0.1", port=8765, reload=False)
+    # PORT comes from the host platform (Railway / Fly / Render).
+    # HOST=0.0.0.0 binds to every interface so the container is reachable.
+    port = int(os.environ.get("PORT", "8765"))
+    host = os.environ.get("HOST", "127.0.0.1")
+    uvicorn.run(
+        "logiq.api:app", host=host, port=port, reload=False,
+        proxy_headers=True, forwarded_allow_ips="*",
+    )

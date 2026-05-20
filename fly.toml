@@ -1,0 +1,49 @@
+# Fly.io deployment config for LogIQ.
+# Apply with:  fly launch --no-deploy   (first time, to claim the app name)
+#              fly volumes create logiq_data --region sin --size 1
+#              fly deploy
+app = "logiq"
+primary_region = "sin"  # Singapore — closest free region to Dhaka
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  HOST = "0.0.0.0"
+  LOGIQ_BASE_DIR = "/app"
+  LOGIQ_DB_PATH = "/app/data/logiq.db"
+  LOGIQ_COOKIE_SECURE = "1"
+
+# Persistent storage for SQLite + uploaded logs — without this the DB
+# and every uploaded .bin/.tlog evaporate on each restart.
+[mounts]
+  source = "logiq_data"
+  destination = "/app/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"   # spin down when idle to stay in free tier
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 50
+    soft_limit = 25
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/stats"
+
+# Smallest free-tier VM (256MB RAM). Pymavlink parsing of very large .bin
+# files may need a bump to 512MB — increase memory_mb if you start seeing
+# OOM kills in `fly logs`.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
