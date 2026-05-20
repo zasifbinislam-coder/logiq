@@ -28,6 +28,11 @@ COPY web/ ./web/
 # disappear on every container restart.
 RUN mkdir -p /app/data/uploads /app/reports
 
+# Run as non-root user so the container works on Hugging Face Spaces
+# (which forces UID 1000) and follows best practice on Fly.io.
+RUN useradd -m -u 1000 user && chown -R user:user /app
+USER user
+
 EXPOSE 8765
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
