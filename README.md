@@ -6,7 +6,7 @@ colorTo: blue
 sdk: docker
 app_port: 8765
 pinned: false
-short_description: AI flight log analytics for ArduPilot — 80 features, anomaly detection, drift alerts
+short_description: AI flight log analytics for ArduPilot
 ---
 
 # LogIQ — AI Flight Log Analytics for ArduPilot
